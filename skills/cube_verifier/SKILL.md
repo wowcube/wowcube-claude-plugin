@@ -495,6 +495,12 @@ Severity: a broken or blank picture, a crash, or content on the wrong face = **c
 wrong scale, a duplicated unique object, an unreadable HUD, black bars = **major**;
 small offsets and fringes = **minor**. Pass = no critical or major finding.
 
+**Capture timing, not a bug:** the eight modules are not in lockstep, so a frame (above all one the run
+summary lists as skewed, `skewed_slots`) can show neighbouring modules one tick apart, e.g. a counter
+reading 12/24 on one screen next to 13/24 on the next. Check the next frame: if it agrees there, it is
+capture timing, not a finding; the same mismatch in two consecutive frames is a real bug
+(`cube_orchestrator/references/VISUAL_GATE.md`, "Per-module skew in one frame").
+
 ### Prompt Template (fresh reviewer)
 
 ```
@@ -514,6 +520,8 @@ hidden simulator run. You only read files; you start nothing.
 3. Check V1-V9 of the cube_verifier Screen Review table on every face
 4. Every finding names the frame path, the face/screen and what is wrong
 5. Report only what the frames show; sound, feel and balance are out of scope
+6. Values one tick apart on neighbouring screens (12/24 next to 13/24) in one frame are capture
+   timing, not a bug, when the next frame agrees
 
 ## Response
 Return ONLY this JSON:

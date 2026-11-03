@@ -162,6 +162,7 @@ python <skills>/scripts/build_pipeline.py validate --manifest plans/<game>_asset
   - `dither: true` only on `"full"` sprites (recommended for smooth gradients and photographic art).
   - **Opaque full-screen backgrounds: `color: "full"`** + `"flags": {"alpha": false, "bg": true}` (a palette `bg` sprite once rendered magenta).
   - Maximum quality (no compromises) = `color: "full"` + `flags.fullsize` + `dither: true`.
+  - **Soft edges**: cut-out edges are binary by default (processing makes every pixel fully opaque or fully transparent; `cube_orchestrator/references/STAGE3_ASSETS.md`, "Edges"). Glows, smoke, light halos, soft shadows and other soft effects carry `"alpha": "soft"` (a palette sprite with `flags.alpha`; never on `color: "full"`). They have no outline, so say in their `description` that Stage 3 lists them under `@style_exempt` (and "Approved exceptions" in STYLE.md) for the outline/style rule.
   - Pick the tier by what the art needs (transparency, native sharpness, colour depth); there is no practical pack-size limit — never cut frames or downgrade art to save bytes.
 - **Animation timing**: at most **20 fps** (the engine ticks 20 times/second); no clip-length or frame-count budget. A full-colour fullsize animation only when the user asked for one, with a "handle carefully" note in its description. **One animated full-screen (fullsize) picture per physical module** is a guideline (unconfirmed), **informational only** (ordinary sprite animations are not limited): when two such pictures would share a module (a face's four screens are four modules, adjacent faces share two, opposite faces none), say so in their descriptions; it blocks nothing.
 - **Sets**: `group` names a family that must read as one (one character's idle/walk/jump/hurt, one prop family). Members of one group that must match share the same `size`, so Stage 3 fits them at one scale.
@@ -384,8 +385,10 @@ Pick the ones relevant to each prompt (all of them are facts from `templates/app
 
 Each prompt MUST have exactly one category, and an `### Input or mechanic change` line: `yes: <what>`
 when the prompt adds or changes an input the game reacts to (tap, twist, tilt, shake) or a rule of play,
-else `no`. A `yes` gets the Playtest Agent in every verification tier, whatever the category
-(`cube_orchestrator/references/RUN_MODES.md`, "Verification tiers"). The orchestrator uses the category
+else `no`. Which prompts get the Playtest Agent is decided by the tier table in
+`cube_orchestrator/references/RUN_MODES.md` ("Verification tiers"), not here: in `lite` (quick) only the
+last prompt is playtested; in `standard` a `yes` is playtested whatever the category; in `full` every
+prompt is. The orchestrator uses the category
 to make pipeline decisions:
 
 | Category | Description | Orchestrator behavior |

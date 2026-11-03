@@ -172,7 +172,7 @@ answer ("Other"); a host without it asks the same questions as a short numbered 
    option says the consequence in time and usage, from `cube_orchestrator/references/RUN_MODES.md`
    ("Estimate"), never a plan name:
    - *Quick* (`verification: lite`, the default) — the game in one or two steps, each built and checked on
-     all 24 screens with one reviewer; a simple game about 30-50 minutes and 1-2 million tokens; more
+     all 24 screens with one reviewer; a simple 1-prompt game about 20–30 minutes and under 1 million tokens; more
      chance a small bug slips through. About 30 pictures.
    - *Normal* (`standard`) — more, smaller steps and two reviewers each; a small game about 2-3 hours and
      about 3-4 million tokens. About 80 pictures.
@@ -237,7 +237,7 @@ For every path that builds a game (new, design document, an existing game, tools
 not detection found everything (when everything is there, say so in one line and skip the question):
 
 **"To build and check your game I need to install a few tools on this computer (Python and the programs
-that build and check games; about N MB). OK to install them?"**
+that build and check games; about N GB to download, about 30–60 minutes). OK to install them?"**
 
 - *Install them* (recommended: every build is checked automatically).
 - *Not now* — then say plainly: "Without these components I can't build or check the game, so I'll stop
@@ -254,6 +254,26 @@ Fill the question from `check_env`'s `[MISSING]` lines, in plain words:
   installed as normal programs, not into `~/.wowcube`, so "nothing else changes" is only said when the
   checker is all that is missing. One short detail line lists what gets installed ("the build checker,
   about 6 MB; the cube's ARM compiler; C++ build tools, several GB"), never tool jargon for a `new` user.
+- Sizes for N (Windows, `check_env.ps1 -Install`; approximate, say "about"; add up only the `[MISSING]`
+  items):
+
+  | Item (winget id) | Download | On disk |
+  |---|---|---|
+  | Python 3.12 (`Python.Python.3.12`, per user) | about 25 MB | about 100 MB |
+  | Python packages (`scripts/requirements.txt`: numpy, Pillow, ...) | about 50 MB | about 150 MB |
+  | LLVM / clang-cl (`LLVM.LLVM`) | about 350 MB | about 2 GB |
+  | ARM GNU toolchain, the cube's compiler | about 150 MB | about 1 GB |
+  | CMake | about 30 MB | about 100 MB |
+  | Ninja | under 1 MB | under 1 MB |
+  | FFmpeg (`Gyan.FFmpeg`) | about 100 MB | about 300 MB |
+  | Visual Studio 2022 Build Tools: C++ workload, Clang tools, Windows SDK | about 3 GB | about 7 GB |
+  | Everything on a clean machine | about 4 GB | about 10-12 GB |
+
+  On a clean machine the whole install takes about 30–60 minutes (mostly the Visual Studio build tools).
+  The Visual Studio build tools need administrator rights: Windows shows a permission prompt the user must
+  accept (some of the other programs may show one too); Python and its packages need none. Plain words
+  for the user, e.g.: "about 4 GB to download and about 11 GB of disk space, 30 to 60 minutes; Windows will
+  ask once for administrator permission for the Microsoft C++ build tools."
 - What the user must do themselves, in plain words, when something cannot be installed for them: on
   Linux the package line
   `check_env.sh` printed (it needs their password: they run it); on macOS `xcode-select --install`
@@ -310,7 +330,7 @@ words cost nothing, jargon confuses a newcomer).
 3. Show the user a short summary in plain words and the estimate from
    `cube_orchestrator/references/RUN_MODES.md` ("Estimate": time and tokens from the game's size), e.g. "A
    new game, I work on my own and stop once to show you the look; pictures drawn in code, sounds made in
-   code; quick checking: about 30 minutes and about 1 million tokens. Change anything? Say 'change my
+   code; quick checking: about 20–30 minutes and under 1 million tokens. Change anything? Say 'change my
    settings'." Art only: "Sprites for your game, drawn in code in one style, normal checking: about
    2-4 minutes per picture plus the reviews; you get PNGs and a sprite sheet."
 4. Return to `cube_orchestrator` with the resolved snapshot (`references/PROFILE.md`, "Resolution").

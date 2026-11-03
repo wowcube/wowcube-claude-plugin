@@ -164,15 +164,15 @@ and say it is an estimate.
 
 | Measured run | Time | Tokens |
 |---|---|---|
-| `lite`, a 1-prompt simple game | ~30 min | ~1.2M (scaled from the 2-prompt run below) |
+| `lite`, a 1-prompt simple game | ~17 min (release 2.4.0); say about 20–30 min | ~0.6M (subagents); say under 1M |
 | `lite`, a new small game (2 prompts, art in code) | ~51 min | ~2.3M |
 | `standard`, a studio game, 8 prompts | ~2 h 15 min | ~3.5M (subagents) |
 | `standard`, one single-feature mod | ~25 min | ~0.85M |
 | `full`, one foundation prompt with one fix round | ~1.5 h | ~2M (subagents) |
 | a light-lane tunable change | a few minutes | well under 0.1M |
 
-Per prompt, for the formula: `lite` ~25 min and ~1.1M tokens (setup and delivery included, so a 1-prompt
-game is ~30 min); `standard` ~17 min and ~0.45M subagent tokens plus ~10% for the main session;
+Per prompt, for the formula: `lite` ~25 min and ~1.1M tokens for each prompt after the first (a 1-prompt
+game, setup and delivery included: say about 20–30 min and under 1M tokens); `standard` ~17 min and ~0.45M subagent tokens plus ~10% for the main session;
 `full` ~1.5 h and ~2M. Art adds about 2-4 min per Codex picture (about a minute per picture drawn in
 code) and ~45 min for the fresh art reviews (`lite`: ~15 min).
 
@@ -243,7 +243,7 @@ pay). The environment blocker still applies.
 **Start line** (autonomous; in the user's language, plain words), printed once, then continue without
 waiting for a reply:
 
-> Making your game for the cube. I'll stop once to show you how it will look, then go on my own to the finished game. Estimate: about 30 minutes and about 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
+> Making your game for the cube. I'll stop once to show you how it will look, then go on my own to the finished game. Estimate: about 20–30 minutes and under 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
 
 Fill the estimate from the table above, the profile's tier and the planned number of prompts (before
 Stage 2, from the game's size: "Estimate"). Guided runs give the same estimate in their first message.

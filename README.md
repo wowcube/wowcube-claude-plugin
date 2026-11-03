@@ -49,7 +49,7 @@ In the docs, `<skills>` means the plugin's folder: two levels above each skill's
    my settings" to change them.
 4. It shows an estimate of time and tokens, then works. It stops once to show you the art style. Step by
    step mode stops at every step; the default runs on within your limits and saves and stops (or asks) when
-   they are reached. A simple game with quick checking takes about 30-50 minutes.
+   they are reached. A simple one-step game with quick checking takes about 20–30 minutes and under 1 million tokens.
 5. You get the game file `dist/app_<game>.oct`, and after one yes it is uploaded to the WowCube store: you
    get a QR code (`dist/app_<game>_qr.png`) and a link. Scan the code with your phone (or open the link on
    it) and the WowCube app installs the game on the cube connected to your phone. A report of what was

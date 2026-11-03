@@ -138,7 +138,9 @@ looks missing. The `<prefix>meta.txt` lists one `snd`/`sndq` line per sound star
    summary reports written and as the schedule owes (`ceil(Seconds*1000 / EveryMs)`). A start error is exit 6 even
    when the simulator said 15 (its `--frames` folder could not be created: `sim_error.txt` decides first). The
    summary's `skewed=N` / `skewed_slots` name frames taken while some screens still showed another topology after a
-   100 ms wait (a twist being redrawn, or the start-up): a note, not a failure; judge the frame after it.
+   100 ms wait (a twist being redrawn, or the start-up): a note, not a failure; judge the frame after it. A frame
+   marked skewed can also show neighbouring modules one tick apart (a counter 12/24 on one screen next to 13/24 on
+   the next): capture timing, not a game bug ("Per-module skew in one frame" below).
 
    Every run also prints a `seams:` line for its last frame (`tools/sim/seams.py`, also runnable on any
    frame: exit 1 = seams). `seams: none` is the pass. A 2-px (x2 art) or 1-px (fullsize art) line of the background
@@ -243,6 +245,8 @@ tilt, so the agent's own taps, twists and tilts would prove nothing.
 captures), so one frame can show a HUD value one tick apart on different screens (score 4 on FRONT, 5 on RIGHT) at
 a tick boundary. Before calling it a finding, look at the next frame (or `record 2 50`): skew that is gone there is
 expected; the same mismatch in two consecutive frames is a real bug (state not computed identically on all modules).
+In hidden runs this shows most often in frames the summary marks skewed (`skewed_slots`): e.g. 12/24 on one module
+next to 13/24 on its neighbour is capture timing, not a game bug; never send it to a fix round on that frame alone.
 
 ## Evidence
 

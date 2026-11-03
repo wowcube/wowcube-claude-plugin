@@ -1331,8 +1331,14 @@ static inline void uprightOffset(int32_t a, float ux, float uy, float* x, float*
     }
 }
 
-// UP_TOWARD[p][s]: the up angle of face s that points at the adjacent face p (-1: s is p or its opposite). Pure cube
-// geometry from the engine's axis tables, checked against OCT_TM_face_up on all six faces up in the simulator.
+// UP_TOWARD[p][s]: indexed [target face p][face s you draw on], both OCT_PLANE_* (0 TOP, 1 FRONT, 2 RIGHT, 3 BACK,
+// 4 LEFT, 5 BOTTOM; each row comment names its p). The value is the "up" angle a (0/90/180/270, the same convention
+// as uprightOffset above) for content drawn on face s so that its top edge points at face p; -1 when s is p or the
+// face opposite p (no edge in common). To make content on s read upright with p above it, use the value as is:
+// pass it to uprightOffset() for the position and use the SAME value as the sprite angle (Tm.A / OCT_add).
+// Never negate it, swap the indices or add 180: that turns the content sideways or upside down. Example: a HUD on
+// FRONT around a TOP playfield is UP_TOWARD[OCT_PLANE_TOP][OCT_PLANE_FRONT] (0). uprightAround() below wraps this.
+// Pure cube geometry from the engine's axis tables, checked against OCT_TM_face_up on all six faces up in the simulator.
 static const int16_t UP_TOWARD[6][6] = {
     { -1,   0,   0,   0,   0,  -1},   // toward TOP
     {180,  -1,  90,  -1, 270,   0},   // toward FRONT
