@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload one finished .oct to the WowCube store backend and make the install QR code (Stage 5 delivery).
+"""Upload one finished .oct to WowCube's servers and make the install QR code (Stage 5 delivery).
 
 The user installs the game from their phone: they scan the QR code (or open the link) and the WowCube app
 puts the game on the cube connected to that phone. Nothing goes to the cube from this computer.
@@ -7,7 +7,7 @@ puts the game on the cube connected to that phone. Nothing goes to the cube from
     python store_upload.py <ws>/dist/app_<game>.oct --yes [--verify] [--qr <png>] [--terminal-qr] [--json]
 
 - `--yes` is required: it says the user agreed to send this file to WowCube's servers (ask once:
-  "Upload the game to the WowCube store to get an install QR code?"). Without it nothing is sent (exit 1).
+  "Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"). Without it nothing is sent (exit 1).
 - The endpoint is open (no account, no token): `POST https://wowcube.com/api/v3/upload`, multipart fields
   name / blobType=oct_app / publisher=WowCube / description / file; a User-Agent header is required
   (403 without it); an `icon` field is never sent (the server hangs, 504); timeout 5 minutes.
@@ -46,7 +46,7 @@ class UploadError(Exception):
 
 
 def multipart_body(path: Path, name: str, blob_type: str = "oct_app") -> tuple[bytes, str]:
-    """The request body and its Content-Type. Fields as the store expects them; never an `icon` field."""
+    """The request body and its Content-Type. Fields as the server expects them; never an `icon` field."""
     data = path.read_bytes()
     boundary = "----wcup" + uuid.uuid4().hex
     parts = []
@@ -72,7 +72,7 @@ def upload(path: Path, endpoint: str = DEFAULT_ENDPOINT, retries_on_504: int = 1
         except urllib.error.HTTPError as e:
             if e.code == 504 and attempt < retries_on_504:
                 attempt += 1
-                print("the store answered 504 (gateway timeout); retrying once", file=sys.stderr)
+                print("the server answered 504 (gateway timeout); retrying once", file=sys.stderr)
                 continue
             hint = {403: " (forbidden: the User-Agent header is missing or refused)",
                     504: " (gateway timeout: the file was not accepted; try again later)"}.get(e.code, "")
@@ -80,10 +80,10 @@ def upload(path: Path, endpoint: str = DEFAULT_ENDPOINT, retries_on_504: int = 1
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise UploadError(f"upload failed: {getattr(e, 'reason', e)}") from None
         except ValueError:
-            raise UploadError("upload failed: the store's answer is not JSON") from None
+            raise UploadError("upload failed: the server's answer is not JSON") from None
     url = payload.get("url") if isinstance(payload, dict) else None
     if not isinstance(url, str) or "/uploads/" not in url or "password=" not in url:
-        raise UploadError(f"upload failed: no install link in the store's answer: {payload!r}")
+        raise UploadError(f"upload failed: no install link in the server's answer: {payload!r}")
     return url
 
 
@@ -131,7 +131,7 @@ def terminal_qr(qr) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("oct", help="the verified .oct (normally <ws>/dist/app_<game>.oct)")
-    ap.add_argument("--yes", action="store_true", help="the user agreed to upload this file to the WowCube store")
+    ap.add_argument("--yes", action="store_true", help="the user agreed to upload this file to WowCube's servers")
     ap.add_argument("--verify", action="store_true", help="download the uploaded file and compare its SHA-256")
     ap.add_argument("--qr", help="QR PNG path (default: <oct folder>/<name>_qr.png)")
     ap.add_argument("--terminal-qr", action="store_true", help="also print the QR code with text characters")
@@ -174,12 +174,12 @@ def main(argv=None) -> int:
     if a.json:
         print(json.dumps(record))
     else:
-        print(f"{path.name} - {len(data) / 1048576:.2f} MB - uploaded to the WowCube store")
+        print(f"{path.name} - {len(data) / 1048576:.2f} MB - uploaded to WowCube")
         print(f"install link: {url}")
         print(f"QR code: {qr_png.resolve()}")
         if verified is not None:
-            print("verified: the store holds the same file (SHA-256)" if verified
-                  else "MISMATCH: the store's file differs from the local one; upload again")
+            print("verified: WowCube's server holds the same file (SHA-256)" if verified
+                  else "MISMATCH: the uploaded file differs from the local one; upload again")
         if a.terminal_qr:
             print(terminal_qr(qr))
     return 3 if verified is False else 0

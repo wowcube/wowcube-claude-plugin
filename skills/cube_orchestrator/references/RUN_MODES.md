@@ -260,6 +260,10 @@ instead: "the list of pictures and sounds", "step", "the checks", "a part of the
 tool", "a Photoshop file", "the automatic checks", "the tools that build the game". Numbers the user can
 act on ("3 of 10 parts done, about 4 hours left") beat scores ("Template 92").
 
+Two words stay out even for developers: "simulator" (the user never sees or controls it: say what is
+checked, "checking the game", "all 24 screens look right") and "store" (say "an install link and a QR
+code for your phone"; the consent question names WowCube's servers, not a store).
+
 When a term has to appear (a file name, the user asked), explain it once in a few words:
 
 | Term | Say |
@@ -270,7 +274,7 @@ When a term has to appear (a file name, the user asked), explain it once in a fe
 | Codex | ChatGPT's coding and drawing tool; it draws on the user's ChatGPT subscription |
 | PSD | a Photoshop file |
 | tokens | how AI usage is counted; a subscription allows a certain amount per week |
-| the automatic checks | a hidden test copy of the cube on this computer that plays every version and looks at all 24 screens (never "the simulator") |
+| the automatic checks | the computer plays every version of the game and looks at all 24 screens (never "the simulator") |
 | QR code | a square code the phone camera reads; it opens the link that installs the game |
 | style lock | the one stop where the user approves how the game looks before everything is drawn |
 
@@ -289,7 +293,7 @@ When a term has to appear (a file name, the user asked), explain it once in a fe
 | Fix rounds used up | Ask: simplify / try again / stop | Rescope if `scope_cuts: auto` and the rescope budget allows, else stop with a report |
 | Budget spent | Save, ask: more budget / simplify / stop | Save, stop with the report |
 | Mod mini-plan, per-change check | Present, STOP | Auto-approved, mods back-to-back; a structural change (T4) always stops ("Interrupts") |
-| Store upload and install QR code (Stage 5) | Ask once, then upload | Ask once ("Upload the game to the WowCube store to get an install QR code?"), then upload; the run's only other stop |
+| Store upload and install QR code (Stage 5) | Ask once, then upload | Ask once ("Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"), then upload; the run's only other stop |
 
 **Real blockers** that stop autonomous mode: the environment (simulator, build kit, toolchain; the ARM
 toolchain from the infra gate on, since every build's device check needs it, CMake and Ninja at Stage 5; a hidden simulator that stops working mid-run, failure policy 5), the Codex login when the profile wants Codex art, a spent run budget (not the image budget), and a game whose simplest

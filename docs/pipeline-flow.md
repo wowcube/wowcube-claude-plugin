@@ -58,7 +58,7 @@ flowchart TD
 
     DET -->|"no verified .oct"| S5["Stage 5: hooks off, version bump,<br/>build_device (public game API) into dist,<br/>mandatory verification"]
     S5 --> UPQ{"User agrees to the store upload? (asked once)"}
-    UPQ -->|"yes"| UPL["scripts/store_upload.py: WowCube store upload, verified;<br/>install QR code dist/app_<game>_qr.png + link; on-device checklist"]
+    UPQ -->|"yes"| UPL["scripts/store_upload.py: upload to WowCube, verified;<br/>install QR code dist/app_<game>_qr.png + link; on-device checklist"]
     UPQ -->|"no"| REP
     UPL --> REP(["Final report (context/<game>_report.md): install QR, what was checked, cuts,<br/>temporary parts, credits, controls"])
     REP -.->|"balance pass or mod"| ORCH
@@ -108,7 +108,7 @@ flowchart TD
 - **Device package without a simulator**: `build_device` builds the ARM module against the public
   game API (`api/apps` + `api/include`) and the container into `dist/`, verified every
   time (unverifiable = failed); only `dist/` is delivered.
-- **Install from the phone**: after one yes, the verified `.oct` goes to the WowCube store; the user
+- **Install from the phone**: after one yes, the verified `.oct` goes to WowCube's servers; the user
   scans the QR code with their phone and the WowCube app installs it on their cube.
 - **Undo**: a snapshot before every change (`<ws>/.history/`); "undo the last change" restores it.
 - **Safety**: no windows over the user's screen, no audio, no global input, PID-only

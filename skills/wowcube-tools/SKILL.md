@@ -3,8 +3,8 @@ name: wowcube-tools
 description: >-
   The WowCube toolbox without stages or gates, for developers who already have a game
   or a build: get and run the bundled standalone simulator, repack assets with a version bump
-  and a device .oct, verify or inspect an .oct, upload it to the WowCube store for an
-  install QR code, compare builds, undo the last change, cut a sprite sheet into
+  and a device .oct, verify or inspect an .oct, upload it to WowCube's servers for an
+  install link and QR code, compare builds, undo the last change, cut a sprite sheet into
   sprites, inspect sounds and their licences, record a demo video. Use when the profile's entry
   mode is "tools", or for single requests like "build the .oct", "repack and bump the
   version", "verify this .oct", "put it on my cube", "give me the QR code", "compare
@@ -33,7 +33,7 @@ installs nothing; installs follow the one-time environment approval).
 | Device `.oct` only | `<skills>/scripts/build_device.ps1 -AppDir <app>` / `build_device.sh --app-dir <app>` | Verifies what it builds; an unverifiable build fails |
 | Verify an `.oct` | `python <skills>/scripts/pack_beta.py --verify-oct <file.oct> --app-dir <app> [--code <app>/out/app_<game>.bin]` | Header (title, version, GUID, categories, save size) against the app's defines, the `ico` map, the ARM code |
 | Is the pack current? | `python <skills>/scripts/build_pipeline.py pack-status --game <game> --workspace assets_<game> --app-dir <app> --manifest plans/<game>_assets.json` | Manifest apps (the pack record) and `art/octpack.json` apps (`index.bin` newer than its inputs); exit 1 prints what changed |
-| Install on the cube (store upload + QR code) | `python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify` | Ask once first ("Upload the game to the WowCube store to get an install QR code?"); writes `dist/app_<game>_qr.png`, prints the link (keep `?password=`); the user scans it with their phone and the WowCube app installs it on their cube. `cube_orchestrator/references/DELIVERY.md` §3. (`tools/cube_upload` is internal and legacy) |
+| Install on the cube (store upload + QR code) | `python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify` | Ask once first ("Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"); writes `dist/app_<game>_qr.png`, prints the link (keep `?password=`); the user scans it with their phone and the WowCube app installs it on their cube. `cube_orchestrator/references/DELIVERY.md` §3. (`tools/cube_upload` is internal and legacy) |
 | Undo the last change | `python <skills>/scripts/history.py restore --workspace <ws> --game <game>` (`list` shows the snapshots; `snapshot` before every change) | Then rebuild and check, and `repack_app.py` (the minor version still goes up): `cube_orchestrator/references/RUN_MODES.md`, "History and undo" |
 | Cut a sprite sheet into sprites | `python <skills>/skills/cube_art-director/scripts/art.py slice <sheet.png> --cell WxH` (or `--grid CxR`, `--atlas a.json`; `--names a,b,..`) | One named PNG per sprite, empty cells skipped; sizes: `art.py sizes` (`cube_art-director/references/SIZES.md`) |
 | List what an `.oct` holds | `python <skills>/scripts/pack_beta.py --inspect-oct <file.oct> [--json]` | Header plus every asset: kind, name, size, payload sha1; no app folder needed |

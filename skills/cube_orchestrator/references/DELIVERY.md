@@ -82,12 +82,12 @@ app folder (an older simulator wrote one at every start) is never the deliverabl
 ## 3. Store upload and the install QR code
 
 The cube does not get the game from this computer. The user installs it from their phone: the finished
-`.oct` goes to the WowCube store backend, the user gets a QR code and a link, scans the code with their
+`.oct` goes to WowCube's servers, the user gets a QR code and a link, scans the code with their
 phone (or opens the link on it), and the WowCube app installs the game on the cube connected to that phone.
 Which cube is connected to the phone is the user's business; nothing here asks about cubes or Bluetooth.
 
-**Ask once** before the first upload of a game (uploading sends the game to WowCube's servers): "Upload the
-game to the WowCube store to get an install QR code?" A yes covers later uploads of the same game in this
+**Ask once** before the first upload of a game (uploading sends the game to WowCube's servers): "Make an install link and a QR code so you can put the game on
+your cube from your phone? (The game file is sent to WowCube's servers for that.)" A yes covers later uploads of the same game in this
 project (record `delivery.store_consent` with the date); a no → the report says the game is ready and the
 QR code comes when they say "upload it".
 

@@ -17,7 +17,7 @@ description: >-
 
 Prepare a verified build environment for one game, so the first coding prompt lands
 in a project that already packs, compiles and renders; and at the end turn the
-finished game into a verified `.oct` the user installs from their phone (the store QR code). A broken toolchain found
+finished game into a verified `.oct` the user installs from their phone (the install QR code). A broken toolchain found
 here costs minutes; found three prompts into implementation it is tangled up with
 new code.
 
@@ -385,7 +385,7 @@ versions on install, so an un-bumped rebuild may not replace the installed one.
 ### Step 3: store upload and the install QR code
 
 The cube does not get the game from this computer: the user installs it from their phone. Ask once per
-game "Upload the game to the WowCube store to get an install QR code?"; after the yes:
+game "Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"; after the yes:
 
 ```
 python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify
@@ -411,7 +411,7 @@ and a relaunch; idle pause after ~60 s; five minutes without a freeze.
 ### Step 5: report
 
 The absolute `dist/app_<game>.oct` path, its size and version, the builder used, the
-verification lines, and the store link and QR code path if it was uploaded. Then return to
+verification lines, and the install link and QR code path if it was uploaded. Then return to
 `cube_orchestrator`.
 
 ## PSD-authored art (human artists)

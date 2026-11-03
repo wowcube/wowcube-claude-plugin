@@ -11,7 +11,10 @@ description: >-
   the AI tools and subscriptions the user has, how thorough checking should be), asks once
   for permission to install the components a game build needs (never on the art-only path),
   and writes the machine profile and the project profile the other skills read. Never a
-  paid service, a download or an install without the user's explicit yes.
+  paid service, a download or an install without the user's explicit yes. Also the
+  environment-only install ("set up the environment", "install everything", "install
+  the WowCube plugin and everything it needs"): installs every component with no other
+  questions, then tells the user to restart Claude Code and start a new session.
 ---
 
 # WowCube setup
@@ -29,8 +32,8 @@ resolution order: `references/PROFILE.md`.
 words, say they are a developer, or answer *Step by step, I know C++*): no "GDD", ".oct", "CC0", "Codex",
 "PSD", "simulator", "toolchain", "compiler", "winget", "pip" in what the user reads before that; the list
 and a short glossary for terms that must appear: `cube_orchestrator/references/RUN_MODES.md`, "Plain
-language". "The simulator" is an internal name (docs, briefs, tool names). To the user it is "the automatic
-checks of every build". Never present it as a separate concept, a separate download, a separate choice or
+language". "The simulator" is an internal name (docs, briefs, tool names), never said to any user,
+developers included. To the user it is "the automatic checks of every build". Never present it as a separate concept, a separate download, a separate choice or
 a way to play: it is one of the components the user agrees to install (Step 2b). Never name or guess
 subscription plans or price tiers: ask what AI tools the user has and take their words as they are.
 
@@ -82,6 +85,32 @@ check:
 No install list, no tool names, no jargon in this message; the details come only when the user asks or
 an install question needs them (Step 2b). Never start with silent tool runs: the user must always know
 what you are doing and why.
+
+## Environment-only install (step 1 of 2 for a new user)
+
+The first contact for a new user is two steps: (1) "install everything" in one session, (2) restart Claude
+Code, open a new session, "I want to make a game". This section is step 1. It runs when the user asks only
+to set up or install ("set up the environment", "install everything", "install the WowCube plugin and all
+it needs", on any machine, typically a clean one), and replaces Step 0 and Steps 2–2b:
+- **The request is the install consent.** Record `install_consent: "yes"` with the date in
+  `~/.wowcube/config.json`; ask nothing else: no game questions, no AI tools question, no thoroughness
+  question (they come in step 2, the first game).
+- **One start line, then work.** In the user's language: "Setting up everything for making WowCube games
+  on this computer: about N GB, about M minutes. You can leave it running; I'll tell you when it's done."
+  (N, M from Step 2b's table for the `[MISSING]` items; on Windows add that it will ask once for
+  administrator permission for the Microsoft C++ build tools.) No explanations of what each tool is, no
+  install lists, no progress commentary beyond one line per finished group ("Python ready", "build tools
+  ready").
+- **Install everything a game build needs**, the same set as Step 2b after a yes: detect (Step 1), then
+  Windows `check_env.ps1 -Install -AcceptAgreements`; the build checker (`get_sim`); the Python packages
+  (Linux/macOS: the `~/.wowcube/venv` venv `check_env.sh` prints); macOS: `brew install` the missing
+  packages when Homebrew is there. What only the user can do (macOS `xcode-select --install` opens Apple's
+  installer; installing Homebrew and Linux package lines need their password): one plain line with the
+  exact command, wait, then go on.
+- **Check, then hand over.** Run `check_env` again. All ok → "Everything is installed. Now close Claude
+  Code, open it again in your games folder, start a new session and say 'I want to make a game for my
+  WowCube'." Then stop: nothing else is started in this session. Something still missing → Step 2b's "No
+  admin rights, a declined Windows prompt, or a failed install" rule.
 
 ## Step 1: detect (read-only, before any question)
 

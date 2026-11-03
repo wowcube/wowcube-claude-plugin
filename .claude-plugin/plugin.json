@@ -1,7 +1,7 @@
 {
   "name": "wowcube",
-  "version": "2.5.0",
-  "description": "WowCube game development skills: cube_orchestrator (single entry point; guided or autonomous within a budget, one style-approval stop, every build checked on hidden 24-screen simulator frames, a verified device .oct and upload to the cube on request), wowcube-setup (first-run detection and a four-question profile), wowcube-tools (simulator, build, repack, verify, upload, video without stages), cube_game-designer (GDD or import of your design document, genre-aware game-feel checks), technical_prompter (implementation prompts with test hooks + the asset manifest), cube_art-director (style-locked art with strict QA; also standalone for artists), cube_asset-builder (art, CC0 sound, launcher icon and fonts -> packed app assets), wowcube-boilerplate (scaffold, game plugin for the bundled standalone simulator, device .oct against the bundled public game API), cube_verifier (code reviewers per verification tier, screen review, playtest), wowcube-html-prototype and wowcube-demo-video (by Alex Poshivalov).",
+  "version": "2.6.0",
+  "description": "Make WowCube games (or just their art) from an idea in plain words: Claude designs, draws, codes and checks the game, then gives you a link and a QR code to install it on your cube from your phone. Start with cube_orchestrator (\"make a cube game\").",
   "author": {
     "name": "WowCube"
   },

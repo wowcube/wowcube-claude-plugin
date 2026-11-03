@@ -4,14 +4,14 @@
     "name": "WowCube"
   },
   "metadata": {
-    "description": "WowCube game pipeline for Claude Code: from an idea or a design document to a verified .oct on the cube.",
-    "version": "2.5.0"
+    "description": "WowCube game pipeline for Claude Code: from an idea or a design document to a tested game on your cube.",
+    "version": "2.6.0"
   },
   "plugins": [
     {
       "name": "wowcube",
       "source": "./",
-      "description": "Design, draw, build, verify and upload games for the WowCube (24 screens, 2x2x2 cube); bundles the public game API and a prebuilt standalone simulator."
+      "description": "Make WowCube games from an idea: design, art, code and checks, then an install link and QR code for your phone."
     }
   ]
 }

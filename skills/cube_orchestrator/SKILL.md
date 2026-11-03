@@ -13,8 +13,8 @@ description: >-
   detects build vs mod and the pipeline stage, and drives every sub-skill and
   subagent within the profile's budget: guided (stepwise) or autonomous, one stop to
   approve the art style and the sound list, every build checked by the agent on
-  hidden 24-screen simulator frames, a verified device .oct at the end, uploaded to
-  the WowCube store (after one yes) for an install QR code the user scans with their
+  hidden 24-screen simulator frames, a verified device .oct at the end, sent to
+  WowCube's servers (after one yes) for an install link and QR code the user scans with their
   phone. Tool-only requests go to wowcube-tools; art-only requests
   (sprites, a sprite sheet, icons, no game code) go to cube_art-director standalone.
 ---
@@ -257,8 +257,13 @@ The user cannot see tool runs and subagents; silence looks like a hang. In their
 - The first time the user meets a pipeline idea (the automatic checks, the style lock, a review round, the
   game file), one sentence on what it is and why it matters to them (the glossary in
   `references/RUN_MODES.md`, "Plain language").
-- The hidden simulator is an internal checking tool: call it "the automatic checks" and never offer it to
-  the user as a way to play or look at the game.
+- **Never mention the simulator**, in any mode and to every user, developers included: the user never sees
+  it and cannot control it. Not "running it in the simulator", "the simulator shows", "simulator frames",
+  "launching the simulator". Say what is checked, not with what: "checking the game", "all 24 screens look
+  right", "the controls work". Name it only when the user asks about it directly, and never offer it as a
+  way to play or look at the game.
+- Keep the checking machinery quiet: one line before a check and one with its result, not a running
+  commentary of builds, runs and frames. The user cares that the game works, not how it was checked.
 - Never name internal agents or roles to the user (Playtest Agent, Requirements Agent, Template Agent,
   verifier, fixer, coder, subagent, "agent-player"): say what is being checked instead: "the code check",
   "the screen check" (all 24 screens), "the automatic gameplay check" ("I'm checking that the controls and
@@ -519,8 +524,8 @@ Read `references/DELIVERY.md`. In short:
    check with `arm-none-eabi-g++`, so a missing toolchain stopped the run before the infra
    gate (entry check 3), not here.
 2. **Deliver from `dist/` only**, never an `.oct` found anywhere else.
-3. **Store upload and the install QR code**: ask once "Upload the game to the WowCube store to get an
-   install QR code?", then `python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify`:
+3. **Store upload and the install QR code**: ask once "Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)",
+   then `python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify`:
    the QR code `dist/app_<game>_qr.png` and the link (keep its `?password=` part). Give both with one line:
    "Scan it with your phone (or open the link on it): the WowCube app installs the game on your cube."
    Nothing goes to a cube from this computer; which cube the phone is connected to is the user's business.
