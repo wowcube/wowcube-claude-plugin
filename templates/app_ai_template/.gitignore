@@ -1,0 +1,33 @@
+.vs/
+x64/
+log.txt
+log_1.txt
+log_2.txt
+sim_user.cfg
+sim.exe
+sim.pdb
+*.raw
+*.obj
+/out/*
+/bin/
+.cproject
+.project
+.settings/
+/build/*
+/art/exported
+/art/packed
+/sound/assets/*
+# The template's own demo sounds ship tracked so a fresh scaffold has a
+# non-silent demo; generated assets a real app drops into sound/assets/
+# stay ignored (the pattern above excludes the directory's contents, not
+# the directory itself, so these negations can still reach inside it).
+!/sound/assets/demo_loop.mp3
+!/sound/assets/demo_blip.mp3
+!/sound/assets/demo_chime.mp3
+*.log
+*.oct
+*.rar
+*.zip
+archive.bat
+*.tiled-session
+build-sim

@@ -1,0 +1,3 @@
+# CI keeps the installed simulator here (WOWCUBE_SIM_DIR=simulator/bin/<os>); never committed
+bin/
+build/

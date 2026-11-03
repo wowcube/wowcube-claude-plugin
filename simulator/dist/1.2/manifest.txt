@@ -1,0 +1,11 @@
+# Written by tools/sim/stage_dist.py: the prebuilt simulator tools/sim/get_sim.* install (no download).
+# build = the commit of sources_repo the binaries were built from (their --version names it); api/SOURCE must
+# name the same commit and version (tests/test_sim_dist.py). <os>=<sha256> <bytes> <file>
+version=1.2
+sources_repo=wowcube/OCT_cube-sim-sources
+build=74237306ed297bedf7d489f899583a962331766c
+origin=CI run 41604714347 of wowcube/OCT_cube-sim-sources
+windows=f888e6c374d8bda8022b6eda48d1d62db1a4f19bd4af1f2402af59515959f372 6486528 windows/wowcube-sim.exe
+linux=40bc3da102252b5cff9b171a9f86699e70630cf3c13e148cec01b0fd11659e10 2784260 linux/wowcube-sim-linux.tar.gz
+macos-arm64=d2249964a3b0008e077681ad62dcfb3d95916d8928259490e3ae332972c6ca91 1751225 macos-arm64/wowcube-sim-macos-arm64.tar.gz
+macos-x86_64=bc0b7b7d733b5a3059ce9fbab02a76437524b667d225c814dc41c18533ee69bc 1919624 macos-x86_64/wowcube-sim-macos-x86_64.tar.gz

@@ -1,0 +1,21 @@
+# Exact pins on purpose: the packer's output is compared byte-for-byte against
+# the reference toolchain (tests/golden/, tests/test_pivot_parity.py), and a quantiser or
+# PNG-decoder change in a dependency moves those bytes. Bump deliberately, in
+# a commit that re-runs the parity measurements.
+# Needs Python 3.11+: numpy 2.4 has no wheels or support for 3.10 (README says the same).
+
+# Image processing (used by build_psd.py, pack.py, unpack.py)
+Pillow==12.2.0
+numpy==2.4.4
+
+# PSD file writing (used by build_psd.py)
+pytoshop==1.2.1
+
+# PSD file reading (used by pack.py)
+psd-tools==1.9.34
+
+# HTTP client for AI sprite generation (used by scripts/image_providers.py, paid image APIs only)
+requests==2.34.2
+
+# QR code for the store install link (used by scripts/store_upload.py, Stage 5 delivery)
+segno==1.6.6
