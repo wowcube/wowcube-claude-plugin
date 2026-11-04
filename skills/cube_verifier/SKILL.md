@@ -4,8 +4,7 @@ description: >-
     Use when verifying WowCube game code after a coder agent completes
     implementation. Defines the Requirements Agent (completeness, GDD,
     regressions), the Template Agent (code against app_ai_template.h and API.md),
-    the Combined Code Reviewer that replaces both in the lite verification tier,
-    the mandatory Screen Review (all 24 screens of the hidden simulator's frame
+    two separate reviewers in every verification tier, the mandatory Screen Review (all 24 screens of the hidden simulator's frame
     dump) and the Playtest Agent (drives the hidden simulator over its MCP
     control socket and scores what it sees). The orchestrator deploys each one
     separately.
@@ -19,15 +18,15 @@ Playtest Agent **drives** the hidden simulator and scores what it sees. Each ret
 
 | Check | Reads | Scoring | When |
 |---|---|---|---|
-| **Requirements Agent** | code, GDD, prompt | completeness 45, gdd_alignment 25, no_regressions 20, verification_criteria 10 | every prompt (`standard`, `full`) |
-| **Template Agent** | code against `app_ai_template.h` + `API.md` | api_correctness 40, platform_constraints 30, code_quality 30 | every prompt (`standard`, `full`) |
-| **Combined Code Reviewer** | both of the above in one agent | completeness 30, gdd_alignment 15, no_regressions 15, api_correctness 25, platform_constraints 15 | every prompt (`lite`, instead of the two above) |
+| **Requirements Agent** | code, GDD, prompt | completeness 45, gdd_alignment 25, no_regressions 20, verification_criteria 10 | every prompt, every tier |
+| **Template Agent** | code against `app_ai_template.h` + `API.md` | api_correctness 40, platform_constraints 30, code_quality 30 | every prompt, every tier |
 | **Screen Review** | the 24-screen PNG dump of a hidden run | PASS / FAIL with findings (no critical or major) | every prompt and every fix, **in every run mode, with or without MCP** |
-| **Playtest Agent** | the running hidden simulator | visual_correctness 40, interaction 35, stability 25 | the prompts the tier names (`lite`: foundation, core; `standard`: mechanic prompts; `full`: all), when the hidden instance's control socket answers |
+| **Playtest Agent** | the running hidden simulator | visual_correctness 40, interaction 35, stability 25 | the prompts the tier names (`lite` and `full`: every prompt; `standard`: mechanic prompts), when the hidden instance's control socket answers |
 
 The tier (`lite` / `standard` / `full`) comes from the user's profile through the orchestrator
 (`cube_orchestrator/references/RUN_MODES.md`, "Verification tiers"); the Screen Review is never
-dropped.
+dropped. The two code agents always run as two separate reviewers: no tier merges them into one
+(the former Combined Code Reviewer of the old `lite` tier was retired on 2026-11-04).
 
 Pass: every deployed code reviewer ≥ 90, Screen Review without critical or major findings,
 Playtest ≥ 90 when deployed, **no unresolved critical issue in any check** (a critical
@@ -383,77 +382,6 @@ Return ONLY this JSON - no markdown, no explanation:
   "summary": "one sentence assessment"
 }
 ```
-
----
-
-## Combined Code Reviewer (`lite` tier)
-
-One agent instead of the Requirements and Template agents, for the `lite` verification tier
-(`cube_orchestrator/references/RUN_MODES.md`). It reads the same files as both and applies both
-rule sets: the Requirements Agent's "How to Verify" and the Template Agent's "Rules to check". Style
-findings (`code_quality`) are reported as minor notes without a deduction; everything that breaks a
-build, the engine contract or the design is scored. The visual gate still runs on every prompt.
-
-### Categories
-
-| Category | Max | What to check |
-|----------|-----|---------------|
-| **completeness** | 30 | every instruction of the prompt is implemented, nothing extra |
-| **gdd_alignment** | 15 | mechanics, visuals and behaviour match the GDD; in Mod mode without a GDD, the recorded `mod_request` (Requirements Agent, "Mod mode without a GDD") |
-| **no_regressions** | 15 | features from `prior_context` still work |
-| **api_correctness** | 25 | every call matches the template's annotations and API.md |
-| **platform_constraints** | 15 | app layout, callbacks, `on_init` order, lockstep, pool, sizes, test hooks, saves, both targets build |
-
-### Prompt Template
-
-```
-<the Safety block above, verbatim>
-
-You are the WowCube code reviewer (lite tier). You check BOTH whether the code
-implements what was asked and whether it uses the engine correctly.
-
-## Task
-<insert Verification Task JSON>
-
-## Rules
-1. Read app_ai_template.h, API.md, the game code, the GDD and prior_context
-   BEFORE scoring
-2. Requirements: every instruction implemented, the GDD matched, earlier
-   features intact, the verification criteria met
-3. Engine: apply the Template Agent's "Rules to check" list of the
-   cube_verifier skill (callbacks, OCT_restart first, TL, OCT_random vs
-   OCT_random_local, OCT_add returning 0, GAP, x2 sizes, appTapQuad with a -1
-   fallback, one sound helper, the three test hooks with their defaults, ARM
-   and Windows-simulator build breakers, saves)
-4. Style issues: minor notes in summary, no deduction
-5. Score ONLY: completeness (max 30), gdd_alignment (max 15),
-   no_regressions (max 15), api_correctness (max 25), platform_constraints (max 15)
-6. Cite file:line and, for engine issues, the annotation or API.md section
-
-## Deduction Rules
-- critical (-10): won't compile or link, feature entirely missing, breaks an
-  existing feature, breaks the engine contract
-- major (-5): partially implemented, GDD mismatch, wrong API usage, lockstep hazard
-- minor (-2): cosmetic difference, small deviation
-- any critical issue = status "fail", whatever the total
-
-## Response
-Return ONLY this JSON - no markdown, no explanation:
-{
-  "agent": "code_review",
-  "prompt": N,
-  "scores": {"completeness": <0-30>, "gdd_alignment": <0-15>, "no_regressions": <0-15>,
-             "api_correctness": <0-25>, "platform_constraints": <0-15>},
-  "total": <sum, 0-100>,
-  "status": "pass if total >= 90 and no critical issue, else fail",
-  "issues": [{"severity": "critical|major|minor", "category": "...", "description": "...",
-              "location": "file:line or function name", "rule": "prompt line, GDD section, annotation or API.md section",
-              "deduction": N}],
-  "summary": "one sentence assessment; say full review or re-check"
-}
-```
-
-Re-check rounds work as for the other code agents ("Re-check rounds").
 
 ---
 

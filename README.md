@@ -24,15 +24,30 @@ copies, one per module, 20 ticks per second; it is installed as a single `.oct` 
 
 ## Install
 
-In Claude Code, two commands:
+One command in a terminal installs the plugin and every tool a game build needs (you need Claude Code; it
+takes a while on a clean computer, and Windows asks once for administrator permission):
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/wowcube/wowcube-create/main/install.sh | bash
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/wowcube/wowcube-create/main/install.ps1 | iex
+```
+
+Then open Claude Code in a folder for your games and say **"I want to make a game for my WowCube"**.
+
+Or in Claude Code, two commands:
 
 ```
-/plugin marketplace add wowcube/wowcube-claude-plugin
+/plugin marketplace add wowcube/wowcube-create
 /plugin install wowcube@wowcube-skills
 ```
 
 Or just ask Claude, in two steps:
-1. **"Install the WowCube plugin from https://github.com/wowcube/wowcube-claude-plugin and set up everything
+1. **"Install the WowCube plugin from https://github.com/wowcube/wowcube-create and set up everything
    it needs."** Allow Claude to run commands and leave it for about half an hour: it installs the plugin
    and every tool a game build needs, with no other questions.
 2. **Restart Claude Code**, open a new session in your games folder and say **"I want to make a game for my
@@ -52,11 +67,14 @@ In the docs, `<skills>` means the plugin's folder: two levels above each skill's
 1. Make an empty folder for your games (your workspace) and start Claude Code in it.
 2. Say: **"Make a cube game: a fox catches fireflies by tilting the cube."**
 3. First time only, it says in plain words what you are going to do together and that a few tools must be
-   set up first, looks at your machine without changing anything, and asks at most four short questions:
-   what you start from, how much guidance you want, which AI tools and subscriptions you have (in your own
-   words: "Claude only", "I have ChatGPT", "Gemini", your own art...), and how thorough the checking should
-   be. "I don't know", "you choose" or "just do it" take the defaults: it works on its own, the art is drawn
-   in code and the sounds are synthesized, nothing leaves your computer. A login or key it finds on the
+   set up first, looks at your machine without changing anything, and asks at most three short questions:
+   what you start from, how much guidance you want, and which AI tools and subscriptions you have (in your
+   own words: "Claude only", "I have ChatGPT", "Gemini", your own art...). The guidance answer also decides
+   the checking: on its own, the game is made in one or two steps and each step is read by two reviewers
+   and played automatically (a simple game takes about 30–45 minutes and about 1 million tokens, a game
+   with menus and levels about 1.5–2.5 hours; estimates); step by step, the steps are smaller and checked
+   as thoroughly as possible. "I don't know", "you choose" or "just do it" take the defaults: it works on
+   its own, the art is drawn in code and the sounds are synthesized, nothing leaves your computer. A login or key it finds on the
    computer is never assumed to be yours. Then it asks once for permission to install what building and
    checking a game needs (Python and its packages, the compilers, a small checker program into
    `~/.wowcube`); after installing, it asks you to restart Claude Code in the same folder and waits for you.
@@ -65,7 +83,7 @@ In the docs, `<skills>` means the plugin's folder: two levels above each skill's
    my settings" to change them.
 4. It shows an estimate of time and tokens, then works. It stops once to show you the art style. Step by
    step mode stops at every step; the default runs on within your limits and saves and stops (or asks) when
-   they are reached. A simple one-step game with quick checking takes about 20–30 minutes and under 1 million tokens.
+   they are reached. A simple one-step game takes about 30–45 minutes and about 1 million tokens (an estimate).
 5. You get the game file `dist/app_<game>.oct`, and after one yes it makes an install link and a QR code
    (`dist/app_<game>_qr.png`; the game file is sent to WowCube's servers for that). Scan the code with your
    phone (or open the link on it) and the WowCube app installs the game on the cube connected to your phone. A report of what was
@@ -115,6 +133,7 @@ Base kit (all profiles):
 | CMake, Ninja | the device `.oct` (all OSes) |
 | ffmpeg | sounds, videos |
 | Node.js + Playwright (optional) | browser prototypes and demo videos |
+| An image-to-video service (optional, e.g. a Higgsfield connector in Claude Code) | animations (idles, walk cycles) made from one approved picture, only if you have it and said so; it uses your credits and you are asked with the cost first |
 | A WowCube and a phone with the WowCube app | installing and playing the game (scan the QR code) |
 
 `<skills>/scripts/check_env.ps1` / `check_env.sh` checks all of it. On Windows `check_env.ps1 -Install`
@@ -162,16 +181,18 @@ You talk to `cube_orchestrator`; it drives the rest.
 
 | Step | What happens | Output |
 |---|---|---|
-| Setup (first use) | detect the machine, four questions, one permission to install the build components | the two profile files |
+| Setup (first use) | detect the machine, three questions, one permission to install the build components | the two profile files |
 | 1. Design | a design document from your idea, or yours imported; checked against game-feel rules for its genre | `plans/<game>_gdd.md` |
 | 2. Plan | small testable implementation steps + the list of pictures and sounds | `plans/<game>_prompts.md`, `plans/<game>_assets.json` |
 | Infra check | the game folder is created, the game builds for the simulator and shows the template | `app_<game>/` |
 | 3. Assets | **art style approved by you**, art drawn and reviewed, sounds sourced, icon, packed | `assets_<game>/`, packed files in `app_<game>/` |
-| 4. Code | per step: coder, code review (one or two reviewers by tier), a look at all 24 screens in the hidden simulator, a playtest, fixes | `app_<game>/src/app_<game>.h` |
+| 4. Code | per step: coder, code review (two separate reviewers), a look at all 24 screens in the hidden simulator, a playtest, fixes | `app_<game>/src/app_<game>.h` |
 | 5. Deliver | the device `.oct`, verified; store upload (one yes) with the install QR code; video, balance passes on request | `dist/app_<game>.oct` |
 
-Verification tiers (`lite`, `standard`, `full`) set how many reviewers, playtests and fix rounds each
-step gets; the look at all 24 screens is never skipped. Details: `docs/pipeline-flow.md`,
+Verification tiers follow the guidance answer: working on its own (`lite`) means one or two steps with
+two reviewers and a playtest on every step and up to 2 fix rounds; step by step (`full`) means smaller
+steps, the same checks and up to 5 fix rounds. `standard` exists only when you ask for it in your own
+words. The look at all 24 screens is never skipped. Details: `docs/pipeline-flow.md`,
 `skills/cube_orchestrator/SKILL.md`, `skills/cube_orchestrator/references/RUN_MODES.md`.
 
 ## Safety

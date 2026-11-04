@@ -89,6 +89,13 @@ The first batch is always `build_pipeline.py generate` (never `ART all`: it woul
 python <skills>/scripts/build_pipeline.py generate --manifest M --workspace assets_<game> --jobs 3
 ```
 - With Codex it first gives every later animation frame a subject reference to its first frame in `fixes.json` (a merge: existing entries keep their text, an entry that already names a `ref` — `null` = deliberately none — is untouched), then delegates to `ART gen` (draws only sprites without a raw image) and `ART process` (key, fit, shared scale per set, colour lock) → `assets_<game>/art/<name>.png`. `generate` takes `--group G` (one manifest group), `--force` (redraw) and `--jobs N` (parallel Codex runs); called directly, `ART gen` selects with `--only a,b` or `--set <group>` (a manifest `group` is an art.py set) and takes `--force` and `--jobs N` too.
+- **Animations from video** (only when the resolved profile says `art.animation: "video"` or the user asks
+  for it, the connector's tools are in this session, and the user agreed to the quoted credits once for
+  this run): for looping idles, walk/run cycles and short actions, after the animation's first frame is
+  approved, `ART budget M --video <anim>` (before submitting), animate, then
+  `python <skills>/scripts/video_to_frames.py <clip> --name <anim> --spec M` writes the frames into
+  `raw/` (the batch then skips them); give those frames `"fit": "canvas"`. Every other animation, and every
+  animation without the opt-in, is drawn frame by frame as below. `cube_art-director/references/ANIMATION_VIDEO.md`.
 - With `_panoramas`: cut the pieces first (Step 5), so each piece has its raw image before the batch; `gen` never redraws a sprite that has one (unless `--force`).
 - Before the first run write what the seed cannot infer into `assets_<game>/fixes.json` (`references/ART.md` "fixes.json"): `@colour_lock` for characters, `@colour_exempt` for intended changes (wounded, broken), refs for state variants (hurt, jump, action poses → the idle), "no characters, only the effect" lines for effects.
 - It also writes placeholder sounds for every manifest sound that has no sourced mp3 yet (`assets_<game>/wav/`, never overwriting a sourced one), so `sound_kit.py build` may run before or after it.

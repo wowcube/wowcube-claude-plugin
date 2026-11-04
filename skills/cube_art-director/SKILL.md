@@ -34,6 +34,12 @@ asset list ──► Codex draws (anchors + subject refs attached) ──► key
   sprites be?" is answered at once from `references/SIZES.md` (the 240x240 screen, the 2x rule, typical
   sizes per role, colours, how sheets are handed over). Every asset's size is checked against its role with
   `art.py sizes <spec>` before anything is drawn, and `qa` flags it again.
+- **Animation from video (optional, opt-in)**: when the user named an image-to-video service ("I have
+  Higgsfield": `profile.art.animation: "video"`) or asks for it, its connector's tools are in this session
+  and they agreed to the quoted credits once for this run, looping idles, walk/run cycles and short actions
+  are animated from one approved picture and cut into frames with `<skills>/scripts/video_to_frames.py`;
+  otherwise every frame is drawn as below. A connector found in the session is not consent.
+  `references/ANIMATION_VIDEO.md`.
 - **Data**: this pipeline trains no model on the user's art. With an outside tool the user chose (Codex,
   an image service), that provider's own data settings apply to what is sent; with their own art or art
   drawn in code nothing leaves the computer. Codex is used only when the user picked it: a login found on
@@ -63,8 +69,9 @@ Codex draws). Talk about pictures only; no "manifest", "pack" or other pipeline 
      "Procedural style"; the same steps with `art.json` instead of a manifest).
 3. **Style lock, families, review** exactly as in the Workflow (2-6); the user approves as the artist.
    Guidance *Just show me results*: they see the style frame (with the bible's one-line summary) and the
-   finished set; family leaders go to a fresh reviewer instead. The thoroughness answer sets the picture
-   budget (`"budget": {"images": N}` in `art.json`: 30 / 80 / 200) and the fresh reviews (2 / 3 / 5).
+   finished set; family leaders go to a fresh reviewer instead. The guidance answer sets the picture
+   budget (`"budget": {"images": N}` in `art.json`) and the fresh reviews: *On my own* / *Just show me
+   results* 30 pictures and 2 reviews, *Step by step* 200 and 5 (an explicit `standard` request: 80 and 3).
 4. **Delivery**: the exact-size PNGs in `<ws>/art_work/final/`, a sprite sheet and its atlas
    (`art.py sheet art.json`, one per set with `--set <set>` when they want one per animation), the QA
    sheet and the review page. On request, a cube-ready asset set: write a WowCube manifest for the same
@@ -99,6 +106,7 @@ Codex draws). Talk about pictures only; no "manifest", "pack" or other pipeline 
 | `feedback <spec> --file fb.json` | folds the page's "Copy feedback" JSON into `fixes.json` and prints the regen command |
 | `all <spec>` | gen -> process -> qa -> review |
 | `sheet <spec> [--only a,b] [--set s] [--cols N] [--padding 2] [--name n]` | the finished images on one grid PNG plus a JSON atlas: `<ws>/sheet/<name>.png` + `<name>.json` (`frames`: each sprite's x, y, w, h; `animations`: one ordered list per set; the common "JSON hash" layout game engines and sheet importers read). Takes the finals `process` wrote; refuses (exit 1) when one is missing |
+| `budget <spec> --video <anim> [--video-frames N] [--credits C]` | records one animation video job in the ledger BEFORE it is submitted: one entry counting the frames it replaces (the spec's `<anim>_NN`); exit 4 = it does not fit, do not submit (`references/ANIMATION_VIDEO.md`) |
 | `doctor --no-codex` | the art is drawn in code or is the artist's own: Codex lines become notes, only Python, Pillow and numpy must be there |
 | `sizes [<spec>]` | the WowCube size guide (`references/SIZES.md`); with a spec, every asset's size against its role (`role` field, else guessed from the name): half size up to 120, fullsize up to 240, the launcher icon 160, typical ranges per role; exit 1 on a size that cannot work. Skipped for an `art.json` whose `"target"` is not the cube |
 | `slice <sheet.png> (--cell WxH \| --grid COLSxROWS \| --atlas a.json) [--names a,b] [--padding P] [--margin M] [--out dir]` | cuts a sprite sheet someone sent into one named PNG per sprite (reading order; empty cells skipped; default names `<sheet>_NN`, or the atlas's names), default `<sheet folder>/sliced/`; use them as drawings (`"source": "drawn/<name>.png"`). The reverse of `sheet` |
@@ -140,7 +148,9 @@ unless `--over-budget` comes with it. A context file that does not parse stops e
 (exit 2) instead of falling back to a default budget. A project that counted images before the
 ledger existed (`spend.images_used`) is carried over as one `seed` entry, and `spend.images_used`
 never goes down. Two runs may share a ledger (a cross-process lock, `<ledger>.lock`).
-`art.py budget <spec>` prints the state. Copies of the artist's own `source` images cost nothing.
+`art.py budget <spec>` prints the state. Copies of the artist's own `source` images cost nothing. An
+animation made from a video is one entry counting the frames cut from it (`budget --video`, recorded
+before the job is submitted); the service's credits are the user's separate yes per run.
 
 `candidates` and `gen` need the Codex CLI; `style`, `anchor`, `process`, `qa`, `review` and
 `feedback` work on whatever images are in the raw folder (in the WowCube pipeline also a
@@ -246,6 +256,8 @@ whose pose change is the point.
 
 - Describe the subject, pose and colours; let the Prompt block and the anchors carry the style. Do not re-describe the style per asset in different words (it drifts).
 - Name the view every time for non-standard assets ("flat front view" for UI in a top-down game).
+- Animations from a video (opted in): `references/ANIMATION_VIDEO.md` has the prompt pattern; the frames
+  come in as drawings (`video_to_frames.py`), with `fixed_canvas` / `"fit": "canvas"` to keep the motion.
 - For animation frames, name the phase and what must stay identical ("same character, same tiara, same dress length, only the legs move").
 - For effects (flash, blast, slash): "no characters, no objects, only the effect", or the anchor's content leaks in.
 - Square canvas, single subject, clear margin, flat key backdrop; the processor crops and scales.

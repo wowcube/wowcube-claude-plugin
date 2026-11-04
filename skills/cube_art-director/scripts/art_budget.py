@@ -17,7 +17,9 @@ The budget (`resolve_budget`), first hit wins:
   1. the context: `art_budget.images`, else `profile.budget.images`
      (wowcube-setup PROFILE.md, "Resolved snapshot");
   2. `<ws>/wowcube.project.json`: `budget.images`, else the tier of `verification`
-     (lite 30, standard 80, full 200; cube_orchestrator RUN_MODES.md);
+     (lite 30, standard 80, full 200; cube_orchestrator RUN_MODES.md); a project file without
+     `verification` takes the tier its `guidance` sets (guided -> full, else lite; wowcube-setup
+     PROFILE.md);
   3. an art.json project's own `"budget": {"images": N}`;
   4. a WowCube manifest with no profile at all: the built-in tier `standard` (80);
      an art.json project without a budget: no cap (the ledger still counts).
@@ -30,6 +32,12 @@ override (`--over-budget`, only on the user's yes), and then every entry drawn p
 budget is marked `over_budget`. Past the budget nothing is drawn unless the caller passes that
 override; overridden entries are marked. A run that needs nothing (everything is drawn) always
 passes, however much is spent.
+
+An animation made from a video (references/ANIMATION_VIDEO.md) is one entry of kind `video` whose
+`count` is the number of frames cut from it: it costs the budget what drawing those frames one by one
+would, so switching routes never changes the budget arithmetic (`art.py budget <spec> --video <anim>`
+records it before the job is submitted). The service's own credits are separate: the user agrees to
+them per run, the entry only notes them (`credits`).
 
 The count: the ledger's entries (an entry may carry `count`, default 1). A context whose
 `spend.images_used` is larger than the ledger (a project that counted before the ledger existed)
@@ -53,6 +61,7 @@ from pathlib import Path
 
 TIER_IMAGES = {"lite": 30, "standard": 80, "full": 200}
 DEFAULT_TIER = "standard"
+GUIDANCE_TIER = {"autonomous": "lite", "guided": "full"}   # scripts/profile_provider.py GUIDANCE_TIER
 EXIT_OVER_BUDGET = 4
 EXIT_UNREADABLE = 2
 LOCK_TIMEOUT_S = 60.0
@@ -205,7 +214,7 @@ def resolve_budget(root: Path, game: str | None, cube: bool, spec_data: dict | N
         v = _num((proj.get("budget") or {}).get("images"))
         if v is not None:
             return v, f"{proj_f} (budget.images)"
-        tier = str(proj.get("verification") or DEFAULT_TIER)
+        tier = str(proj.get("verification") or GUIDANCE_TIER.get(str(proj.get("guidance") or "autonomous"), "lite"))
         if tier in TIER_IMAGES:
             return TIER_IMAGES[tier], f"{proj_f} (verification: {tier})"
     if spec_data:
@@ -303,20 +312,31 @@ class Ledger:
         return cap is None or self.spent + need <= cap
 
     # ------------------------------------------------------------------ writing
-    def charge(self, name: str, kind: str, attempt: int = 1) -> tuple[bool, str]:
-        """Record one image request before it is made; (False, why) when the budget is spent. A
-        read-modify-write under the cross-process lock: entries other runs added are kept."""
+    def charge(self, name: str, kind: str, attempt: int = 1, count: int = 1,
+               extra: dict | None = None) -> tuple[bool, str]:
+        """Record one request before it is made; (False, why) when it does not fit in the budget. A request
+        that stands for several images (an animation video job: `count` = the frames it replaces) is one
+        entry with that `count` and must fit whole. A read-modify-write under the cross-process lock:
+        entries other runs added are kept."""
+        count = max(1, int(count))
         with self._tlock, _FileLock(self.lock_path):
             self.entries = self._load()
             cap = self.cap
-            if cap is not None and self.spent >= cap:
-                return False, (f"image budget spent ({self.spent}/{cap}, {self._cap_source()}); not drawn "
-                               f"(--over-budget only on the user's yes)")
+            if cap is not None and self.spent + count > cap:
+                if count == 1:
+                    return False, (f"image budget spent ({self.spent}/{cap}, {self._cap_source()}); not drawn "
+                                   f"(--over-budget only on the user's yes)")
+                return False, (f"image budget: {self.spent}/{cap} spent ({self._cap_source()}) and this request "
+                               f"counts {count}; not made (--over-budget only on the user's yes)")
             entry = {"t": _now(), "name": name, "kind": kind, "attempt": attempt}
-            if self.budget is not None and self.spent >= self.budget:
+            if count != 1:
+                entry["count"] = count
+            if extra:
+                entry.update({k: v for k, v in extra.items() if k not in entry})
+            if self.budget is not None and self.spent + count > self.budget:
                 entry["over_budget"] = True
             self.entries.append(entry)
-            self._mine += 1
+            self._mine += count
             _write_atomic(self.path, json.dumps({"budget": self.budget, "budget_source": self.source,
                                                  "spent": self.spent, "entries": self.entries}, indent=1))
             self._mirror_spent()

@@ -48,6 +48,9 @@ compromises correctness — when in doubt, wait.
 Paths: `<ws>` is the user's workspace (it holds `wowcube.project.json`, `app_<game>/`,
 `assets_<game>/`, `plans/`, `context/`, `dist/`, and the engine folders the build kit uses);
 `<skills>` = the folder two levels above this SKILL.md (the plugin root; `${CLAUDE_PLUGIN_ROOT}` when the host exports it); resolve it on every entry, never store it.
+`python` in the commands below (and in every pipeline skill) means `~/.wowcube/venv/bin/python` on Linux/macOS
+when that venv exists (the one-command installer and setup create it; Homebrew and Debian Python refuse global
+packages), else `python` / `python3` on PATH.
 It holds `skills/`, `scripts/`, `templates/`, `tools/` and `simulator/`.
 Commands run from `<ws>`. Throw-away files (repro captures, test images, probe scripts, logs), yours and every
 subagent's, go under `<ws>/.agent_scratch/<short name>/`, never deep inside `assets_<game>/` or `app_<game>/`,
@@ -71,7 +74,7 @@ reason to `context/rules.md` and pass the relevant lines into every brief
 Resolve the profile (`wowcube-setup/references/PROFILE.md`, "Resolution"): the request, the context,
 `<ws>/wowcube.project.json`, `~/.wowcube/config.json`, role defaults. No `config.json` or no
 `wowcube.project.json`, or the user says "setup" / "reconfigure" → invoke `wowcube-setup` first (it
-greets the user, detects the machine while saying what it checks, asks at most four questions and, for
+greets the user, detects the machine while saying what it checks, asks at most three questions and, for
 every path that builds a game, asks once for permission to install the build components). Write the resolved snapshot into the
 context as `profile` and pass it to every sub-skill and every subagent brief (`profile` field,
 `references/AGENT_BRIEFS.md`). Then route by the starting point:
@@ -137,9 +140,10 @@ for this run, else the resolved profile's `guidance` (`guided` = stepwise).
 A reconfigure changes `guidance`, so the next entry's `run_mode` follows it; the context never
 overrides the profile.
 
-The **verification tier** (`lite` / `standard` / `full`) comes from the profile and sets the code
-reviewers, the playtests, the fix rounds, the rescopes and the image budget; the visual gate runs in
-every tier. Read `references/RUN_MODES.md` before the intake of every new run: intake questions, the
+The **verification tier** (`lite` / `standard` / `full`) comes from the profile, where it follows the
+guidance (autonomous → `lite`, the quick lane with the full set of checks; guided → `full`; `standard`
+only on the user's explicit words), and sets the number of prompts, the fix rounds, the rescopes and the
+image budget; every tier runs two code reviewers, and the visual gate runs in every tier. Read `references/RUN_MODES.md` before the intake of every new run: intake questions, the
 start line with its time and usage estimate, the tiers, what each mode keeps, safe parallelism, the
 bounded failure policy and the end-of-run report. Clauses below marked *(stepwise)* apply only in
 stepwise mode.
@@ -298,8 +302,8 @@ approval when the source is an approved studio GDD.
 
 ## Stage 2 — Prompts and manifest
 
-Invoke `technical_prompter`. It sizes the plan by the game and the tier: `lite` (*Quick*, or the user
-asked for something fast or simple) is **1 prompt** when the core loop, input, scoring and game over fit
+Invoke `technical_prompter`. It sizes the plan by the game and the tier: `lite` (autonomous guidance,
+the default) is **1 prompt** when the core loop, input, scoring and game over fit
 one coherent change, **2** when the game also has separate structure, never more; `standard` / `full`
 use as many testable slices as the game needs. Recompute the estimate from the planned prompt count
 (`references/RUN_MODES.md`, "Estimate") and say it in one line if it changed. Accept its output only when:
@@ -445,15 +449,15 @@ prompt, self-contained instructions. Failures → back to `technical_prompter`.
    and test hooks (`references/AGENT_BRIEFS.md`).
 2. **Coder** subagent writes `app_<game>/src/app_<game>.h` (plus `app_metadata.h` /
    `app_save.h` when the prompt adds saves or optional callbacks).
-3. **Checks, in parallel**: the tier's code review (`lite`: one Combined Code Reviewer;
-   `standard` / `full`: the Requirements Agent and the Template Agent; `cube_verifier`, read-only,
-   code), and the **visual gate** (every tier), which you run yourself:
+3. **Checks, in parallel**: the code review, in every tier two separate reviewers, the Requirements
+   Agent and the Template Agent (`cube_verifier`, read-only, code), and the **visual gate** (every
+   tier), which you run yourself:
    build the hidden simulator with the test hooks, run it with 24-screen frame dumps,
    LOOK at the frames, write findings (`references/VISUAL_GATE.md`). A build error is a
    critical finding.
-4. **Playtest Agent** (`cube_verifier`) on the prompts the tier names (`lite`: one short playtest on
-   the last prompt only; `standard`: foundation, core and secondary; `full`: every prompt) **and, in
-   `standard` and `full`, on any prompt that adds or changes an input or a mechanic, whatever its category** (its
+4. **Playtest Agent** (`cube_verifier`) on the prompts the tier names (`lite` and `full`: every
+   prompt; `standard`: foundation, core and secondary) **and, in `standard`, on any prompt that adds or
+   changes an input or a mechanic, whatever its category** (its
    `### Input or mechanic change` line; `references/RUN_MODES.md`, "Verification tiers"), when the hidden
    instance's control socket answers (`SIM_MCP.md`): taps, twists, tilts, scored on what it sees. It needs only the
    simulator, so start it as soon as the gate run has ended, while the code reviewers are
@@ -710,11 +714,11 @@ describes the existing structures so it extends, never rewrites. Assets:
 
 ### M5 — Verify
 The Stage 4 gates of the profile's tier (`references/RUN_MODES.md`, "Verification tiers"): the tier's
-code review (`lite`: the Combined Code Reviewer; `standard` / `full`: Requirements + Template), each
+code review (Requirements + Template, in every tier), each
 ≥ 90 with no critical issue and no open major; the visual gate in every tier; the Playtest Agent by the
 mod's category, read from the tier's playtest row: T1 that changes input or a mechanic and T4 count as
 `core` (and get the playtest in every tier by the input-or-mechanic rule), a T1 number change counts as
-`polish`, T2 and T3 count as `audio` / `polish` (playtest only in `full`). Framed for a mod:
+`polish`, T2 and T3 count as `audio` / `polish` (playtest in `lite` and `full`, not in `standard`). Framed for a mod:
 (a) the change is there, (b) nothing else moved compared with the M1 baseline frames
 (`no_regressions` weighs most; `gdd_alignment` against the GDD when one exists, else against the recorded
 `mod_request`). Fixer: the tier's
@@ -733,7 +737,7 @@ built with the fallback builder; moving it to the dev layout is a T4 change (ask
 | Setting | Default | Notes |
 |---|---|---|
 | Profile | `~/.wowcube/config.json` + `<ws>/wowcube.project.json` | written by `wowcube-setup`; resolution in its `references/PROFILE.md` |
-| Verification tier | from the profile (built-in default `standard`) | `lite` / `standard` / `full`: reviewers, playtests, fix rounds, rescopes, image budget (`references/RUN_MODES.md`) |
+| Verification tier | from the profile, following `guidance` (autonomous → `lite`, guided → `full`) | `lite` / `standard` / `full`: prompts, playtests, fix rounds, rescopes, image budget (`references/RUN_MODES.md`) |
 | Verification threshold | 90 | per deployed agent (code reviewers, Playtest); any unresolved critical issue fails regardless of score |
 | Max fix rounds | tier: 2 / 3 / 5 | per prompt or mod change; `budget.fix_rounds` overrides |
 | Visual gate | always, every tier | after every coder and fixer run (`references/VISUAL_GATE.md`) |

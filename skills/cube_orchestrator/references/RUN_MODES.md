@@ -122,30 +122,38 @@ These decide whether the result runs on the cube; no mode, tier or budget suspen
 
 ## Verification tiers
 
-The tier comes from the profile (`verification`); a request may raise it for one run ("check
-everything"). It sets how much checking each prompt gets; the hard invariants above hold in all three.
+The tier comes from the profile (`verification`), which follows the guidance answer (owner decision
+2026-11-04; there is no question about checking): **autonomous** (*On my own*, *Just show me results*,
+the default) = `lite`, the quick lane; **guided** (both *Step by step* answers) = `full`. `standard` is
+never offered to the user; it exists only when the user asks for it in their own words ("check it more
+but not every detail"). A request may raise the tier for one run ("check everything thoroughly" →
+`full`); nothing lowers the checks below `lite`: "fast", "quick" or "just a simple game" picks the
+quick structure, never fewer reviewers or playtests. The hard invariants above hold in all three.
+
+The id `lite` is kept so that existing profiles keep working; since 2026-11-04 it no longer means lighter
+checks: an older project file with `verification: lite` gets the checks below without any change.
 
 | | `lite` | `standard` | `full` |
 |---|---|---|---|
 | Prompts (`technical_prompter` sizes them by the game) | **1** when the core loop, input, scoring and game over fit one coherent change (snake, tap-the-target, a simple puzzle); **2** when the game also has separate structure (1 = the core loop playable on all faces with its input; 2 = title, levels, game over, sound, polish). Never more | as many as the game needs, each a testable slice (a small game usually 4-8) | as `standard` |
-| Code review | ONE combined code reviewer (requirements + API/template, `cube_verifier` "Combined Code Reviewer") | Requirements Agent + Template Agent | Requirements Agent + Template Agent |
-| Re-check after a fix | the combined reviewer re-checks the fixer's diff | both re-check the diff (`cube_verifier` "Re-check rounds") | both re-check the diff; a full review whenever `cube_verifier` asks for one |
+| Code review | Requirements Agent + Template Agent, two separate reviewers, every prompt | Requirements Agent + Template Agent | Requirements Agent + Template Agent |
+| Re-check after a fix | both re-check the diff (`cube_verifier` "Re-check rounds") | both re-check the diff (`cube_verifier` "Re-check rounds") | both re-check the diff; a full review whenever `cube_verifier` asks for one |
 | Visual gate | every coder and fixer run | every coder and fixer run | every coder and fixer run |
-| Playtest Agent | one short playtest on the last prompt (the input really works) | every `foundation`, `core` and `secondary` prompt, plus any prompt that adds or changes an input or a mechanic | every prompt |
+| Playtest Agent | every prompt | every `foundation`, `core` and `secondary` prompt, plus any prompt that adds or changes an input or a mechanic | every prompt |
 | Max fix rounds per prompt | 2 | 3 | 5 |
 | Rescopes per run (autonomous) | 2 | 3 | 5 |
 | Default image budget (Stage 3) | 30 | 80 | 200 |
 | Fresh art reviews (Stage 3), then focused re-checks of the fixes | 2, then 2 | 3, then 2 | 5, then 3 (still open after them: waived on the record and reported, STAGE3_ASSETS.md §10) |
-| Role default | creator | developer | staff |
+| Who gets it | autonomous guidance (*On my own*, *Just show me results*, the default) | only on the user's explicit words | guided (*Step by step*), or "check everything thoroughly" |
 
-**The quick lane (`lite`).** One or two prompts, and per prompt only the gates that prove the game builds
-and runs on the cube: the plugin build with the ARM `-Werror` device check, a hidden run with the
-24-screen review (frames looked at, then deleted), ONE combined code reviewer (template/API rules and the
-requirements), at most 2 fix rounds; one short playtest on the last prompt; then the device `.oct` and
-`pack_beta.py --verify-oct` as always. A user who says "fast", "quick", "just a simple game", or picks
-*Quick*, gets this lane.
+**The quick lane (`lite`).** One or two prompts, and every prompt gets the full set of checks: the plugin
+build with the ARM `-Werror` device check, a hidden run with the 24-screen review (frames looked at, then
+deleted), the Requirements Agent and the Template Agent as two separate reviewers, and the Playtest Agent;
+at most 2 fix rounds; then the device `.oct` and `pack_beta.py --verify-oct` as always. What makes it
+quick is the structure (few prompts, few fix rounds, a small image budget), never fewer checks. Every
+autonomous run gets this lane unless the profile or the request says otherwise.
 
-**The playtest rule (`standard`, `full`), one sentence:** a prompt gets the Playtest Agent when its category is listed for
+**The playtest rule (`standard`; `lite` and `full` playtest every prompt), one sentence:** a prompt gets the Playtest Agent when its category is listed for
 the tier **or** it adds or changes an input (a tap, twist, tilt or shake the game reacts to) or a
 mechanic (a rule of play), **whatever its category**: a `ui` prompt that adds "tap to restart" or a
 `polish` prompt that changes how a twist moves the hero is playtested in `standard` too. The
@@ -157,24 +165,25 @@ prompt and the report says nobody drove the game. The profile's `budget.images` 
 
 ## Estimate (the start line and the setup summary)
 
-Measured on real runs, whole runs including setup checks, art drawn in code, the device `.oct`. Compute the
+Measured on real runs (the `lite` rows are estimates built on the old `lite` measurements, labelled so), whole runs including setup checks, art drawn in code, the device `.oct`. Compute the
 estimate from the **planned number of prompts** (`plans/<game>_prompts.md`; before Stage 2, from the game's
-size: a simple game is 1-2 prompts in `lite`, a small game 4-8 in `standard`), never from a fixed count,
+size: a simple game is 1-2 prompts in `lite`, a small game 4-8 in `full`), never from a fixed count,
 and say it is an estimate.
 
 | Measured run | Time | Tokens |
 |---|---|---|
-| `lite`, a 1-prompt simple game | ~17 min (release 2.4.0); say about 20–30 min | ~0.6M (subagents); say under 1M |
-| `lite`, a new small game (2 prompts, art in code) | ~51 min | ~2.3M |
+| `lite`, a 1-prompt simple game | estimate: about 30–45 min (old lite, one reviewer: ~17 min measured, release 2.4.0) | estimate: about 1M (old lite: ~0.6M subagents) |
+| `lite`, a new small game (2 prompts, art in code) | estimate: about 1.5–2.5 h (old lite, one reviewer and a playtest only on the last prompt: ~1 h 40 min measured in a QA run) | estimate: about 1.5M subagent tokens, about 2M with the main session (old lite: ~1.2M subagents measured) |
 | `standard`, a studio game, 8 prompts | ~2 h 15 min | ~3.5M (subagents) |
 | `standard`, one single-feature mod | ~25 min | ~0.85M |
 | `full`, one foundation prompt with one fix round | ~1.5 h | ~2M (subagents) |
 | a light-lane tunable change | a few minutes | well under 0.1M |
 
-Per prompt, for the formula: `lite` ~25 min and ~1.1M tokens for each prompt after the first (a 1-prompt
-game, setup and delivery included: say about 20–30 min and under 1M tokens); `standard` ~17 min and ~0.45M subagent tokens plus ~10% for the main session;
-`full` ~1.5 h and ~2M. Art adds about 2-4 min per Codex picture (about a minute per picture drawn in
-code) and ~45 min for the fresh art reviews (`lite`: ~15 min).
+Per prompt, for the formula: `lite` a 1-prompt game, setup and delivery included, about 30–45 min and
+about 1M tokens, and each further prompt about 45–75 min and about 0.5–1M tokens (two reviewers and a
+playtest per prompt; estimates, the new `lite` is not measured yet); `standard` ~17 min and ~0.45M subagent
+tokens plus ~10% for the main session; `full` ~1.5 h and ~2M. Art adds about 2-4 min per Codex picture
+(about a minute per picture drawn in code) and ~45 min for the fresh art reviews (`lite`: ~15 min).
 
 Never name, invent or guess subscription plans. Say the time and the tokens; when the user has told you
 their subscription and its weekly limit in tokens or as they know it, add roughly what share of that limit
@@ -204,7 +213,7 @@ and the reviews, no code (drawn in code: about a minute per picture, no image bu
 
 | Mod | `lite` | `standard` / `full` |
 |---|---|---|
-| One change (M0 import incl. art extraction, the change, its gates, the repack and the device `.oct`) | ~1 h, ~1M subagent tokens (measured: one sprite change on a game delivered without art sources) | `standard`: ~25 min, ~0.85M tokens (~0.6M subagent + ~0.25M main session; measured 2026-11-03: a fork adding one small feature with three code-drawn sprites, Claude only, art drawn in code; one fresh art review, no fix round). `full`: not measured |
+| One change (M0 import incl. art extraction, the change, its gates, the repack and the device `.oct`) | estimate: about 1–1.5 h, about 1.2M subagent tokens (old lite with one reviewer measured ~1 h, ~1M: one sprite change on a game delivered without art sources; now two reviewers and a playtest) | `standard`: ~25 min, ~0.85M tokens (~0.6M subagent + ~0.25M main session; measured 2026-11-03: a fork adding one small feature with three code-drawn sprites, Claude only, art drawn in code; one fresh art review, no fix round). `full`: not measured |
 | Each further change in the same run | less: the import, the baseline frames and the extraction are done once | |
 
 A tunable change (speed, timing, a count) goes through the light lane: a few minutes. A T4 structural
@@ -233,7 +242,7 @@ the infra gate until the user says it is done.
 
 "I don't know", "you choose", "skip setup", "just do it", or no answer to a question: take the defaults
 and go on autonomously: the AI the user came with (Claude), the art drawn in code, the sounds synthesized,
-no outside service, the quick checking level. Outside services (Codex, an image service, downloaded sounds)
+no outside service, the autonomous checking (`lite`: few prompts, full checks). Outside services (Codex, an image service, downloaded sounds)
 only when the user picks them by name.
 
 `YOLO`: after the risk confirmation, skip questions 1 and 2 (invent the concept; no Codex → the
@@ -243,7 +252,7 @@ pay). The environment blocker still applies.
 **Start line** (autonomous; in the user's language, plain words), printed once, then continue without
 waiting for a reply:
 
-> Making your game for the cube. I'll stop once to show you how it will look, then go on my own to the finished game. Estimate: about 20–30 minutes and under 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
+> Making your game for the cube. I'll stop once to show you how it will look, then go on my own to the finished game. Estimate: about 30–45 minutes and about 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
 
 Fill the estimate from the table above, the profile's tier and the planned number of prompts (before
 Stage 2, from the game's size: "Estimate"). Guided runs give the same estimate in their first message.

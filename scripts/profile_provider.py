@@ -126,17 +126,38 @@ def read_choice(workspace=None, manifest=None, *, machine_config: Path | None = 
 
 # --------------------------------------------------------------------------- setup answers -> profile fields
 # wowcube-setup asks "What AI tools and subscriptions do you have?" (the user's own words are the source of
-# truth, detection only pre-fills or adds a note) and "How thorough should checking be?". These map the answers
-# onto the project file (skills/wowcube-setup/references/PROFILE.md, "Setup answers").
-RESOURCE_IDS = ('claude', 'codex', 'gemini', 'image_key', 'local_model', 'own_art')
+# truth, detection only pre-fills or adds a note) and "How should I work with you?", whose answer also sets the
+# verification tier (there is no separate thoroughness question). These map the answers onto the project file
+# (skills/wowcube-setup/references/PROFILE.md, "Setup answers").
+RESOURCE_IDS = ('claude', 'codex', 'gemini', 'image_key', 'local_model', 'own_art', 'video')
+# `video`: an image-to-video service the user named ("I have Higgsfield"); it makes animations only, never the
+# pictures themselves (skills/cube_art-director/references/ANIMATION_VIDEO.md)
+ANIMATION_ROUTES = ('frames', 'video')
+# guidance -> verification tier. `lite` keeps the quick structure (1-2 prompts, 2 fix rounds) with the full set of
+# checks per prompt; `full` is the thorough tier of a stepwise run (cube_orchestrator RUN_MODES.md).
+GUIDANCE_TIER = {'autonomous': 'lite', 'guided': 'full'}
+# free-text overrides the user may still write ("check everything thoroughly", "quick"). None of them is lighter
+# than `lite`: "quick" names the quick structure, never fewer checks. `standard` only on an explicit request.
 THOROUGHNESS = {'quick': 'lite', 'normal': 'standard', 'thorough': 'full'}
+TIERS = ('lite', 'standard', 'full')
 _CLOUD_LEAVES = ['prompts', 'reference_images']
 
 
+def verification_for_guidance(guidance: str | None) -> str:
+    """The resolved `guidance` (`autonomous` / `guided`; also the setup answers' words) -> the verification tier:
+    autonomous (On my own, Just show me results, the default) -> `lite`; guided (Step by step) -> `full`."""
+    key = str(guidance or 'autonomous').strip().lower()
+    key = {'stepwise': 'guided', 'step by step': 'guided', 'on my own': 'autonomous',
+           'just show me results': 'autonomous'}.get(key, key)
+    if key not in GUIDANCE_TIER:
+        raise ValueError(f'unknown guidance {guidance!r}; known: {", ".join(GUIDANCE_TIER)}')
+    return GUIDANCE_TIER[key]
+
+
 def verification_for(thoroughness: str) -> str:
-    """'quick' / 'normal' / 'thorough' (the setup answer) -> the verification tier lite / standard / full."""
+    """A free-text checking override ('quick' / 'normal' / 'thorough', or a tier id) -> lite / standard / full."""
     key = str(thoroughness or '').strip().lower()
-    if key in THOROUGHNESS.values():
+    if key in TIERS:
         return key
     if key not in THOROUGHNESS:
         raise ValueError(f'unknown thoroughness {thoroughness!r}; known: {", ".join(THOROUGHNESS)}')
@@ -175,15 +196,29 @@ def provider_hint(have) -> str | None:
     return None
 
 
-def data_policy_for(art_source: str, provider: str | None = None) -> list[str]:
+def animation_for(have) -> str:
+    """`art.animation` for the setup answer: `video` only when the user named an image-to-video service
+    (`resources.have` holds `video`), else `frames` (every frame drawn by the picture route). A connector found
+    in the session is never this answer; using it also needs the connector's tools in the session and the
+    user's yes to the cost, once per run."""
+    have = {str(h).strip().lower() for h in (have or [])}
+    return 'video' if 'video' in have else 'frames'
+
+
+def data_policy_for(art_source: str, provider: str | None = None, animation: str | None = None) -> list[str]:
     """What may leave the machine for the chosen art route: Codex or a cloud provider get the prompts and the
-    reference images; a local model, the artist's own art, drawn-in-code art and a mod's kept art send nothing."""
+    reference images; a local model, the artist's own art, drawn-in-code art and a mod's kept art send nothing.
+    `animation: video` adds `animation_frames`: the base picture of each animation and its motion description
+    go to the video service."""
     src = str(art_source or '').lower()
+    out = []
     if src == 'codex':
-        return list(_CLOUD_LEAVES)
-    if src == 'provider' and _norm(provider) not in ('local_sd', 'none'):   # not yet chosen: assume a cloud one
-        return list(_CLOUD_LEAVES)
-    return []
+        out = list(_CLOUD_LEAVES)
+    elif src == 'provider' and _norm(provider) not in ('local_sd', 'none'):   # not yet chosen: assume a cloud one
+        out = list(_CLOUD_LEAVES)
+    if str(animation or '').lower() == 'video':
+        out.append('animation_frames')
+    return out
 
 
 def credential(choice: ProfileChoice) -> tuple[str | None, str]:

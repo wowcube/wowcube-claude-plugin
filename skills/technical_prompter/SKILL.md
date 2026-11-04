@@ -72,7 +72,7 @@ Read `<skills>/templates/app_ai_template/API.md` and `templates/app_ai_template/
 **Size the plan by the game and the tier, never to a fixed count.** Every prompt costs a full round of
 checks (a build, the 24-screen check, a code review, fixes), so fewer, coherent prompts finish sooner.
 
-- **`lite` (the user picked *Quick*, or asked for something fast or simple): 1 or 2 prompts, never more.**
+- **`lite` (autonomous guidance, the default; also when the user asked for something fast or simple): 1 or 2 prompts, never more.**
   - **1 prompt** when the core loop, the input, scoring and game over fit one coherent change (snake,
     tap-the-target, a simple puzzle): the test hooks and tunables blocks, the playfield on its faces, the
     input, the rules, the score and the game over, the sounds, in one prompt.
@@ -80,7 +80,7 @@ checks (a build, the 24-screen check, a code review, fixes), so fewer, coherent 
     faces with its input (hooks and tunables included); Prompt 2 = title, levels, game over, sound and
     polish.
   - The ~100-lines rule and the slice ordering below do not apply; each prompt still has its
-    Verification section, and the last one names the input the playtest drives.
+    Verification section and names the input the playtest drives (every `lite` prompt is playtested).
 - **`standard` / `full`: as many testable slices as the game needs** (a small game usually 4-8), with the
   ordering and rules below; merge slices that are too small to be worth a round of checks.
 
@@ -386,9 +386,8 @@ Pick the ones relevant to each prompt (all of them are facts from `templates/app
 Each prompt MUST have exactly one category, and an `### Input or mechanic change` line: `yes: <what>`
 when the prompt adds or changes an input the game reacts to (tap, twist, tilt, shake) or a rule of play,
 else `no`. Which prompts get the Playtest Agent is decided by the tier table in
-`cube_orchestrator/references/RUN_MODES.md` ("Verification tiers"), not here: in `lite` (quick) only the
-last prompt is playtested; in `standard` a `yes` is playtested whatever the category; in `full` every
-prompt is. The orchestrator uses the category
+`cube_orchestrator/references/RUN_MODES.md` ("Verification tiers"), not here: in `lite` and `full` every
+prompt is playtested; in `standard` a `yes` is playtested whatever the category. The orchestrator uses the category
 to make pipeline decisions:
 
 | Category | Description | Orchestrator behavior |

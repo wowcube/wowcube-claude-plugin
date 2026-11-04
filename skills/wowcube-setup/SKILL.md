@@ -7,8 +7,9 @@ description: >-
   budget", "use another image provider" (in any language). Greets the user, then
   detects the machine read-only while saying what it checks (OS, agent host, Python, the
   build-check components, Codex, image providers, local Stable Diffusion, Node/Playwright,
-  ffmpeg, ARM toolchain), asks at most four short questions (starting point, guidance,
-  the AI tools and subscriptions the user has, how thorough checking should be), asks once
+  ffmpeg, ARM toolchain), asks at most three short questions (starting point, guidance,
+  the AI tools and subscriptions the user has; the guidance answer also sets how thoroughly
+  each step is checked), asks once
   for permission to install the components a game build needs (never on the art-only path),
   and writes the machine profile and the project profile the other skills read. Never a
   paid service, a download or an install without the user's explicit yes. Also the
@@ -38,7 +39,7 @@ a way to play: it is one of the components the user agrees to install (Step 2b).
 subscription plans or price tiers: ask what AI tools the user has and take their words as they are.
 
 **Defaults: the AI the user came with, everything made in code.** The art is drawn in code, the sounds are
-synthesized, no outside service is used, the run is autonomous with quick checking. "I don't know", "you
+synthesized, no outside service is used, the run is autonomous (one or two steps, each with the full set of checks). "I don't know", "you
 choose", "skip setup", "just do it", "go", or a question left unanswered → these defaults (never stepwise),
 and say so in one line. Outside services (ChatGPT/Codex, an image service, downloaded sounds) only when the
 user picks them by name.
@@ -93,7 +94,7 @@ Code, open a new session, "I want to make a game". This section is step 1. It ru
 to set up or install ("set up the environment", "install everything", "install the WowCube plugin and all
 it needs", on any machine, typically a clean one), and replaces Step 0 and Steps 2–2b:
 - **The request is the install consent.** Record `install_consent: "yes"` with the date in
-  `~/.wowcube/config.json`; ask nothing else: no game questions, no AI tools question, no thoroughness
+  `~/.wowcube/config.json`; ask nothing else: no game questions, no guidance question, no AI tools
   question (they come in step 2, the first game).
 - **One start line, then work.** In the user's language: "Setting up everything for making WowCube games
   on this computer: about N GB, about M minutes. You can leave it running; I'll tell you when it's done."
@@ -142,7 +143,7 @@ Presence-only key check (PowerShell):
 `'OPENAI_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY','XAI_API_KEY','OPENROUTER_API_KEY','IMAGE_API' | Where-Object { [Environment]::GetEnvironmentVariable($_) } `
 (bash: `for v in OPENAI_API_KEY GEMINI_API_KEY GOOGLE_API_KEY XAI_API_KEY OPENROUTER_API_KEY IMAGE_API; do [ -n "${!v}" ] && echo "$v"; done`).
 
-## Step 2: ask (at most four questions, one AskUserQuestion call)
+## Step 2: ask (at most three questions, one AskUserQuestion call)
 
 One line before the questions on why they matter ("Your answers decide how I work with you, what the
 art is made with and how much time and usage the game takes; you can change them later: say 'change my
@@ -150,9 +151,9 @@ settings'"). Each option's description says in plain words what choosing it mean
 first option of every question is the default (above) and is marked so.
 
 Skip any question the request already answered ("I have a design document", "just install this game
-file", "I only want the sprites", "I have ChatGPT", "check everything"). "Skip setup", "just do it",
-"you choose", "I don't know" → no more questions: the defaults (autonomous, drawn in code, synthesized
-sound, quick checking), then only the install question (Step 2b) when something is missing. Option labels
+file", "I only want the sprites", "I have ChatGPT"). "Skip setup", "just do it",
+"you choose", "I don't know" → no more questions: the defaults (autonomous with its checking, drawn in
+code, synthesized sound), then only the install question (Step 2b) when something is missing. Option labels
 below are English examples. The question tool shows at most four options per question plus a free-text
 answer ("Other"); a host without it asks the same questions as a short numbered list.
 
@@ -165,21 +166,32 @@ answer ("Other"); a host without it asks the same questions as a short numbered 
      code" (`entry: art`). No game is designed, coded or built: the art director works with the user
      directly (Step 2c) and delivers PNG files and a sprite sheet. This path never needs the build-check
      components, the ARM toolchain or a C++ compiler, and never asks to install them.
-2. **Guidance** — "How should I work with you?"
-   - *On my own* (autonomous, the default) — I run to the finished game and stop only to show you the
-     look.
+2. **Guidance** — "How should I work with you?" The answer also sets how each step is checked
+   (`verification`, `profile_provider.verification_for_guidance`); there is no separate question about
+   checking and no "less careful" choice. Every option's description says the consequence in time and
+   usage, from `cube_orchestrator/references/RUN_MODES.md` ("Estimate"), as an estimate, never a plan
+   name or a tier name:
+   - *On my own* (autonomous, the default; `verification: lite`) — I run to the finished game and stop
+     only to show you the look. The game is made in one or two steps, and every step is built, looked at
+     on all 24 screens, read by two separate reviewers and played automatically before the next one; a
+     simple game takes about 30–45 minutes and about 1 million tokens, a game with menus and levels about
+     1.5–2.5 hours and about 2 million tokens (estimates). About 30 pictures.
      This answer writes `budget.scope_cuts: auto` (it overrides the role default `ask`: the user said not
      to stop for anything but the art style), unless they add "ask me before cutting anything". The
-     thoroughness answer does not change it (it sets the checks and the image budget, not the stops). An
-     approved design document (`source.approved: true`) still keeps every scope or mechanic change for
+     checking it sets does not change that (the checks set the reviewers and the image budget, not the
+     stops). An approved design document (`source.approved: true`) still keeps every scope or mechanic change for
      the user's yes (`references/PROFILE.md`, "Precedence of `scope_cuts`").
-   - *Step by step* (guided) — I explain each step and wait for your OK.
-   - *Step by step, I know C++* — the same, technical detail welcome.
+   - *Step by step* (guided; `verification: full`) — I explain each step and wait for your OK. The game is
+     made in more, smaller steps, each checked as thoroughly as I can (two reviewers, an automatic
+     playtest, up to five fix rounds); about 1.5 hours and about 2 million tokens per step, so a bigger
+     game can take several days of sessions (estimates). About 200 pictures.
+   - *Step by step, I know C++* — the same, technical detail welcome (`verification: full`).
    - *Just show me results* — "I don't care about the code": no technical words ever, I decide the
      technical things myself and show you only what you can see and judge: the art style, the finished
      pictures (art only: each family's first picture and the final set), the game's screens. Writes
      `guidance: autonomous`, `experience: new`, `budget.scope_cuts: ask` (a cut of something the user can see
-     is still theirs to decide). The answer that fits an artist on the *Art only* path.
+     is still theirs to decide), and the same checking, time and pictures as *On my own*
+     (`verification: lite`). The answer that fits an artist on the *Art only* path.
 3. **AI tools and subscriptions** — "What AI tools and subscriptions do you have?" Multi-select plus free
    text; the user's words are the source of truth (`resources.have`, their own words in `resources.note`).
    - *Only Claude* — nothing else: the art is drawn in code in a deliberate style, or it is your own art.
@@ -190,26 +202,25 @@ answer ("Other"); a host without it asks the same questions as a short numbered 
      before every paid batch. A local model is free and stays on this computer.
    - *An artist, or my own art* — one PNG per picture (a sprite sheet is cut into named pictures first,
      `art.py slice`; a Photoshop file's layers are exported as PNGs); I size, check and pack them.
-   The free-text answer covers anything else ("I have Claude and Gemini", "a friend draws for me").
+   The free-text answer covers anything else ("I have Claude and Gemini", "a friend draws for me"). An
+   image-to-video service the user names there ("I have Higgsfield") is `video`: it makes animations from
+   an approved picture, never the pictures themselves (Step 2a).
    Pre-selected: *Only Claude*. Detection never adds a tool the user did not name and never pre-selects
    one: a logged-in Codex or a key in the environment is not mentioned in the options at all; when the
    user names ChatGPT, or asks what this computer has, ask once whether the login found here is theirs
    and may be used ("Rules" above). No answer, "I don't know" → *Only Claude*. Mapping to the ids
    (`scripts/profile_provider.py`, `RESOURCE_IDS`): `claude`, `codex`, `gemini`, `image_key`,
-   `local_model`, `own_art`.
-4. **Thoroughness** — "How thorough should checking be?" (not asked on a tools-only request). Each
-   option says the consequence in time and usage, from `cube_orchestrator/references/RUN_MODES.md`
-   ("Estimate"), never a plan name:
-   - *Quick* (`verification: lite`, the default) — the game in one or two steps, each built and checked on
-     all 24 screens with one reviewer; a simple 1-prompt game about 20–30 minutes and under 1 million tokens; more
-     chance a small bug slips through. About 30 pictures.
-   - *Normal* (`standard`) — more, smaller steps and two reviewers each; a small game about 2-3 hours and
-     about 3-4 million tokens. About 80 pictures.
-   - *Thorough* (`full`) — two reviewers and a playtest of every step, more fix rounds; about 1.5 hours and
-     about 2 million tokens per step: a bigger game can take several days of sessions. About 200 pictures.
-   - Free text: hours, a maximum number of pictures, "cut what you need without asking".
-   On *Art only* the same answer sets the picture budget and the number of fresh art reviews (Quick 30
-   pictures and 2 reviews, Normal 80 and 3, Thorough 200 and 5).
+   `local_model`, `own_art`, `video`. A video connector found in the session is not an answer: never
+   pre-select or suggest it.
+
+Free text in any answer still overrides the checking and the budgets for this project: "check everything
+thoroughly" → `verification: full`; "check it more but not every detail" → `standard` (the only way to
+get it; never offered as an option); a number of hours or a maximum number of pictures → `budget.hours` /
+`budget.images`; "cut what you need without asking" → `budget.scope_cuts: auto`. Nothing makes the
+checking lighter than *On my own*: "quick" or "fast" means the one-or-two-step game, never fewer checks.
+On *Art only* the guidance answer sets the picture budget and the number of fresh art reviews the same
+way (*On my own* / *Just show me results*: 30 pictures and 2 reviews; *Step by step*: 200 and 5; an
+explicit `standard`: 80 and 3).
 
 ### Step 2a: follow-ups (a second short call, only what the first answers need)
 
@@ -255,6 +266,12 @@ answer ("Other"); a host without it asks the same questions as a short numbered 
   One way only → no question: say in one line what the art will be made with. The choice sets
   `data_policy.may_leave_machine` (`profile_provider.data_policy_for`): Codex or a cloud provider get the
   prompts and reference images; everything else sends nothing.
+- **Animations from video**, only when the tools answer named an image-to-video service: no question,
+  one line: "You have Higgsfield: I can use it to animate characters (idles, walks) from their approved
+  picture. It uses your Higgsfield credits, so I'll tell you the cost and ask before each run." Writes
+  `art.animation: video`, `art.animation_provider` (e.g. `higgsfield`) and adds `animation_frames` to
+  `data_policy.may_leave_machine` (`profile_provider.animation_for`, `data_policy_for(..., animation=)`).
+  Otherwise `art.animation: frames`. Route and rules: `cube_art-director/references/ANIMATION_VIDEO.md`.
 - Sound is not a setup question: the default is synthesized sound (`sound.source: synth`: tones, chords
   and a simple music loop made in code, nothing downloaded, a final choice). Real recordings (free sounds
   anyone may use, downloaded after the user approves the list; `sound.source: cc0`) only when the user
@@ -330,8 +347,8 @@ No game, no build, no install question. What it needs: Python with Pillow and nu
 Codex draws), and the drawing route from the tools answer. Route to `cube_art-director` standalone
 ("Art only", its SKILL.md): the user is the artist (style lock with them, generation through what they
 have or drawn in code, strict QA), and the delivery is PNG files, a sprite sheet with its atlas
-(`art.py sheet`), and on request a cube-packed asset set. The thoroughness answer sets the picture budget
-and the review rounds; guidance decides how often it stops (*Just show me results*: the style frame and
+(`art.py sheet`), and on request a cube-packed asset set. The guidance answer sets the picture budget
+and the review rounds (through `verification`, Step 2) and how often it stops (*Just show me results*: the style frame and
 the finished set).
 
 Role: do not ask it as a question. Infer it from the answers and use only its defaults
@@ -340,7 +357,7 @@ Role: do not ask it as a question. Infer it from the answers and use only its de
 2. their own design document, or they said they know C++ (*Step by step, I know C++*, or their own words) → developer;
 3. everyone else → creator. That includes *On my own* and *Just show me results* by someone new to WowCube
    or to game making: the role gives the plain-language defaults, and the Guidance answer still
-   wins for `guidance` and `scope_cuts`, as it always does; the thoroughness answer sets the tier.
+   wins for `guidance`, `scope_cuts` and `verification`, as it always does.
 
 Experience (`experience`, how messages are worded) is recorded on every path, never asked separately:
 *Step by step*, *Just show me results* and the defaults → `new`; *Step by step, I know C++* → `cpp`;
@@ -359,9 +376,10 @@ words cost nothing, jargon confuses a newcomer).
 3. Show the user a short summary in plain words and the estimate from
    `cube_orchestrator/references/RUN_MODES.md` ("Estimate": time and tokens from the game's size), e.g. "A
    new game, I work on my own and stop once to show you the look; pictures drawn in code, sounds made in
-   code; quick checking: about 20–30 minutes and under 1 million tokens. Change anything? Say 'change my
-   settings'." Art only: "Sprites for your game, drawn in code in one style, normal checking: about
-   2-4 minutes per picture plus the reviews; you get PNGs and a sprite sheet."
+   code; every step checked by two reviewers and an automatic playtest: about 30–45 minutes and about 1
+   million tokens (my estimate). Change anything? Say 'change my settings'." Art only: "Sprites for your
+   game, drawn in code in one style, I show you the look and the finished set: about a minute per picture
+   plus the reviews; you get PNGs and a sprite sheet."
 4. Return to `cube_orchestrator` with the resolved snapshot (`references/PROFILE.md`, "Resolution").
 
 ## Missing pieces: tell once, then go on

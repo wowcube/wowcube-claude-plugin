@@ -7,7 +7,7 @@ dispatching the first coder of a session. Engine facts and limits are in
 
 ## Safety block (top of EVERY subagent brief)
 
-Coders, fixers, the code reviewers (Requirements, Template or Combined), the Playtest Agent and art
+Coders, fixers, the code reviewers (Requirements and Template), the Playtest Agent and art
 reviewers all get it, verbatim:
 
 ```
@@ -136,8 +136,7 @@ rounds"). The agents' prompt
 templates, categories and response JSON are defined in `cube_verifier`
 (Requirements: completeness 45, gdd_alignment 25, no_regressions 20,
 verification_criteria 10; Template: api_correctness 40, platform_constraints 30,
-code_quality 30; Combined Code Reviewer, `lite` tier only: completeness 30, gdd_alignment 15,
-no_regressions 15, api_correctness 25, platform_constraints 15; Playtest: visual_correctness 40,
+code_quality 30; Playtest: visual_correctness 40,
 interaction 35, stability 25; each
 scored out of 100, pass at 90 **and no critical issue**: one critical issue fails the
 agent whatever its total). Prepend the Safety block to each of them.

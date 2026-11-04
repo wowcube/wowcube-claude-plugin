@@ -30,6 +30,9 @@
   python art.py feedback <spec> --file fb.json      fold the page's "Copy feedback" JSON into fixes.json
   python art.py all      <spec> [gen options]       gen -> process -> qa -> review
   python art.py budget   <spec>                     image budget: requests spent, the cap and where it comes from
+  python art.py budget   <spec> --video <anim> [--video-frames N] [--credits C]
+                                                    record one animation video job before it is submitted
+                                                    (counts as its N frames; exit 4 when it does not fit)
   python art.py sheet    <spec> [--only a,b] [--set s] [--cols N] [--padding 2] [--name sheet]
                                                     the finished images on one grid PNG + a JSON atlas
                                                     (<workspace>/sheet/<name>.png + <name>.json: frames
@@ -1097,6 +1100,23 @@ def cmd_sheet(args) -> int:
 def cmd_budget(args) -> int:
     p, _ = load(args)
     led = ledger(p, args)
+    if args.video:
+        # an animation from a video service (references/ANIMATION_VIDEO.md): one job, recorded BEFORE it is
+        # submitted, counting the frames it replaces (the spec's <anim>_NN frames, or --video-frames)
+        rx = re.compile(rf"^{re.escape(args.video)}_\d{{2,}}$")
+        frames = [a.name for a in p.assets if rx.match(a.name)]
+        count = args.video_frames if args.video_frames is not None else len(frames)
+        if count < 1:
+            print(f"ERROR: no frames named {args.video}_00, {args.video}_01, ... in the spec: give --video-frames N",
+                  file=sys.stderr)
+            return 1
+        extra = {"credits": args.credits} if args.credits is not None else None
+        ok, why = led.charge(args.video, "video", 1, count=count, extra=extra)
+        if not ok:
+            print(f"ERROR: {why}. Nothing was recorded: do not submit the video job. Ask the user before raising "
+                  f"the budget.", file=sys.stderr)
+            return art_budget.EXIT_OVER_BUDGET
+        print(f"video job for {args.video} recorded as {count} image(s)")
     print(led.status() + ("" if led.remaining() is None else f"; {led.remaining()} left"))
     return 0
 
@@ -1136,6 +1156,13 @@ def main(argv=None) -> int:
                          "tier's, art_budget.py); above the budget only together with --over-budget")
     ap.add_argument("--over-budget", action="store_true",
                     help="gen/candidates: draw past the image budget (only on the user's yes; marked in the ledger)")
+    ap.add_argument("--video", default=None,
+                    help="budget: record one animation video job for this animation (frames <video>_NN) before "
+                         "it is submitted; it counts as the frames it replaces (references/ANIMATION_VIDEO.md)")
+    ap.add_argument("--video-frames", type=int, default=None, help="budget --video: images it counts (default: the "
+                                                            "spec's frames of that animation)")
+    ap.add_argument("--credits", type=float, default=None, help="budget --video: the service's quoted credits "
+                                                                "(noted in the ledger only)")
     ap.add_argument("--cols", type=int, default=None, help="sheet: columns (default: a square-ish grid)")
     ap.add_argument("--padding", type=int, default=2, help="sheet: transparent pixels between cells (default 2)")
     ap.add_argument("--name", default=None, help="sheet: file name without extension (default: the --set, else sheet)")

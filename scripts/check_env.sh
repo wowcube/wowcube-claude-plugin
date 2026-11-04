@@ -88,6 +88,8 @@ done
 have uv && info "uv found (only octpack-build against an optional octavios checkout uses it)"
 
 # --- assets ----------------------------------------------------------------------
+# the pipeline's Python on Linux/macOS is the ~/.wowcube/venv one when it exists (install.sh makes it)
+if [ -x "$HOME/.wowcube/venv/bin/python3" ]; then PATH="$HOME/.wowcube/venv/bin:$PATH"; info "python: $HOME/.wowcube/venv"; fi
 if have python3 && ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
     miss "python 3.11+ (python3 is older; the pinned numpy needs 3.11)" "see the install line below (python3, python3-venv, python3-pip), or uv python install 3.12"
 elif have python3; then

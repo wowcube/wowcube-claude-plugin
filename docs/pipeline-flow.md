@@ -43,8 +43,8 @@ flowchart TD
 
     PACK --> CODER["Stage 4, prompt N: coder subagent"]
     DET -->|"prompts left"| CODER
-    CODER --> CHECKS["In parallel: code review per tier (lite: one combined reviewer;<br/>standard/full: Requirements + Template);<br/>visual gate (every tier): hidden muted simulator, 24-screen frames, the agent looks"]
-    CHECKS --> PLAY["Playtest Agent over the control socket<br/>(lite: foundation/core prompts; standard: mechanic prompts; full: all)"]
+    CODER --> CHECKS["In parallel: code review (every tier: Requirements + Template,<br/>two separate reviewers);<br/>visual gate (every tier): hidden muted simulator, 24-screen frames, the agent looks"]
+    CHECKS --> PLAY["Playtest Agent over the control socket<br/>(lite and full: every prompt; standard: mechanic prompts)"]
     PLAY --> PASS{"reviewers 90, no critical issue anywhere,<br/>no major visual finding, playtest 90,<br/>no open major from any agent?"}
     PASS -->|"no, rounds left (2 / 3 / 5 by tier)"| FIX["Fixer: all issues + the frames that show them"]
     FIX --> CHECKS

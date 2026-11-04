@@ -52,7 +52,7 @@ from what the user picked (never from a detected login or key; `none` until they
   "budget": {"hours": null, "images": null,
              "fix_rounds": null, "rescopes": null, "scope_cuts": "ask|auto"},
   "art": {"source": "codex|own|procedural|provider|placeholder|original", "provider": "openai|null",
-          "new": "procedural|codex"},
+          "new": "procedural|codex", "animation": "frames|video", "animation_provider": "higgsfield|null"},
   "sound": {"source": "synth|cc0"},
   "data_policy": {"may_leave_machine": ["prompts", "design_text", "reference_images"]}
 }
@@ -76,14 +76,33 @@ from what the user picked (never from a detected login or key; `none` until they
 - `guidance: guided` = the stepwise run mode; `autonomous` = the autonomous run mode within `budget`
   (*Just show me results* is `autonomous` with `experience: new` and `scope_cuts: ask`).
 - `resources` is the user's own answer to "What AI tools and subscriptions do you have?": `have` holds the
-  ids of what they picked or wrote (`claude`, `codex`, `gemini`, `image_key`, `local_model`, `own_art`;
+  ids of what they picked or wrote (`claude`, `codex`, `gemini`, `image_key`, `local_model`, `own_art`,
+  `video` for an image-to-video service such as Higgsfield;
   `scripts/profile_provider.py` `RESOURCE_IDS`), `note` their words. It is the source of truth for the art
   routes (`profile_provider.art_routes`): a tool that detection found but the user did not name is never
   used; it is at most mentioned once. Drawn in code (`procedural`) and the user's own art are always
   possible. Nothing in a profile names a subscription plan.
-- `verification` comes from "How thorough should checking be?": *Quick* = `lite`, *Normal* = `standard`,
-  *Thorough* = `full` (`profile_provider.verification_for`); the tier sets the reviewers, playtests, fix
-  rounds, rescopes, the image budget and the art review rounds (RUN_MODES.md, "Verification tiers").
+- `art.animation`: how animation frame sets are made. `frames` (the default, also when absent): every
+  frame is drawn by the picture route. `video`: looping idles, walk/run cycles and short actions are
+  animated by the image-to-video service in `art.animation_provider` (e.g. `higgsfield`) from one approved
+  picture and cut into frames (`cube_art-director/references/ANIMATION_VIDEO.md`). Written `video` only
+  when the user named such a service (`resources.have` holds `video`; `profile_provider.animation_for`).
+  Resolution: the current request ("animate it with Higgsfield", "draw every frame") wins, then the project
+  file, then `frames`. Using it at run time also needs the connector's tools in the session (missing: the
+  frames are drawn, said once) and the user's yes to the quoted credits once per run; a connector found in
+  the session is never the answer, and the consent is never stored. It adds `animation_frames` to
+  `data_policy.may_leave_machine` (the base picture and the motion description go to the service);
+  `may_leave_machine: []` rules it out.
+- `verification` follows the guidance answer; there is no question about it
+  (`profile_provider.verification_for_guidance`): `autonomous` (*On my own*, *Just show me results*, the
+  defaults) = `lite`, `guided` (both *Step by step* answers) = `full`. `lite` is the quick structure (one or
+  two prompts, 2 fix rounds) with the full set of checks on every prompt: two separate code reviewers, the
+  24-screen review and the playtest. `standard` is never offered; it is written only when the user asks
+  for it in their own words ("check it more but not every detail"), and "check everything thoroughly"
+  writes `full` (`profile_provider.verification_for`). No answer makes the checks lighter than `lite`. The
+  tier sets the reviewers, playtests, fix rounds, rescopes, the image budget and the art review rounds
+  (RUN_MODES.md, "Verification tiers"). A project file without `verification` resolves it from
+  `guidance` the same way.
 - `budget.images`, `fix_rounds`, `rescopes`: `null` (or absent) = the verification tier's value
   (`lite` 30 / 2 / 2, `standard` 80 / 3 / 3, `full` 200 / 5 / 5; RUN_MODES.md). Set a number only to
   override the tier. `budget.images` is enforced by the tools: every image request is counted in
@@ -109,14 +128,15 @@ from what the user picked (never from a detected login or key; `none` until they
 
 ## Role defaults (defaults only; they grant nothing)
 
-| Role | guidance | experience | verification | scope_cuts |
-|---|---|---|---|---|
-| creator | autonomous | new | lite | auto |
-| developer | autonomous | cpp | standard | ask |
-| staff | autonomous | cpp | full | auto |
+| Role | guidance | experience | scope_cuts |
+|---|---|---|---|
+| creator | autonomous | new | auto |
+| developer | autonomous | cpp | ask |
+| staff | autonomous | cpp | auto |
 
-Tier limits (fix rounds, rescopes, playtests, image budget) come from the tier, not the role:
-`cube_orchestrator/references/RUN_MODES.md`, "Verification tiers".
+The role never sets `verification`: it follows `guidance` (above). Tier limits (fix rounds, rescopes,
+playtests, image budget) come from the tier: `cube_orchestrator/references/RUN_MODES.md`, "Verification
+tiers".
 
 ## Precedence of `scope_cuts` (one rule)
 
@@ -127,8 +147,8 @@ From strongest to weakest; the first that applies decides:
    scope (same name and size) is not a scope change.
 2. The current request ("cut what you need", "ask before cutting").
 3. The project file's `budget.scope_cuts`, which the setup survey writes: *On my own* (and the defaults)
-   writes `auto`, also with *Quick* checking (thoroughness sets the tier and the image budget,
-   never the stops); *Just show me results* and "ask me before cutting" write `ask`.
+   writes `auto` (the checking tier it sets changes the checks and the image budget, never the
+   stops); *Just show me results* and "ask me before cutting" write `ask`.
 4. The role default (table above): only when the project file has no `scope_cuts`.
 
 A guided (stepwise) run asks before any cut whatever this says: it stops at every step anyway.
@@ -137,13 +157,13 @@ A guided (stepwise) run asks before any cut whatever this says: it stops at ever
 
 For each field, the first source that sets it wins:
 
-1. the current request ("stepwise", "use Codex", "lite checks", "spend at most 20 images");
+1. the current request ("stepwise", "use Codex", "check everything thoroughly", "spend at most 20 images");
 2. `context/<game>_context.json` for run state only (stage, spend so far); never for a profile field;
 3. `<ws>/wowcube.project.json`;
 4. `~/.wowcube/config.json` (machine facts and the provider choice);
 5. role defaults (table above);
-6. built-in defaults: `guidance: autonomous`, `experience: new`, `verification: lite`, `art.source:
-   procedural` (drawn in code), `sound.source: synth`, `resources.have: ["claude"]`: the AI the user came
+6. built-in defaults: `guidance: autonomous`, `experience: new`, `verification` from `guidance`
+   (`lite` when autonomous), `art.source: procedural` (drawn in code), `sound.source: synth`, `resources.have: ["claude"]`: the AI the user came
    with and everything made in code. Codex, an image service or downloaded sounds only when the user
    picked them; a login or key found on the machine is never a default. "I don't know", "you choose",
    "skip setup", "just do it" and an unanswered question resolve to these.
@@ -161,9 +181,9 @@ file's fields, with every gap resolved, the tier's limits filled into `budget`, 
 
 ```json
 {"resolved_at": "2026-11-02T10:00", "entry": "new", "role": "developer", "guidance": "autonomous",
- "experience": "cpp", "verification": "standard", "resources": {"have": ["claude", "codex"]},
- "budget": {"hours": null, "images": 80, "fix_rounds": 3, "rescopes": 3, "scope_cuts": "ask"},
- "art": {"source": "codex", "provider": null}, "sound": {"source": "cc0"},
+ "experience": "cpp", "verification": "lite", "resources": {"have": ["claude", "codex"]},
+ "budget": {"hours": null, "images": 30, "fix_rounds": 2, "rescopes": 2, "scope_cuts": "ask"},
+ "art": {"source": "codex", "provider": null, "animation": "frames"}, "sound": {"source": "cc0"},
  "data_policy": {"may_leave_machine": ["prompts"]}}
 ```
 
@@ -200,9 +220,9 @@ leaves the rest untouched; a lower number is upgraded in place by `wowcube-setup
 | Question | Answer | Writes |
 |---|---|---|
 | Starting point | *A new game* / *My design document* / *An existing game* / *Art only* | `entry`: `new` / `gdd` / `mod` or `tools` (follow-up "What should I do with it?") / `art` |
-| Guidance | *On my own* (default) / *Step by step* / *Step by step, I know C++* / *Just show me results* | `guidance` + `experience` + `budget.scope_cuts` (setup SKILL.md, Step 2) |
-| AI tools and subscriptions | multi-select + free text | `resources.have` / `resources.note`; then `art.source` (follow-up only when more than one route), `art.provider`, `data_policy` (`profile_provider.data_policy_for`) |
-| Thoroughness | *Quick* (default) / *Normal* / *Thorough* (+ free text: hours, pictures, "cut without asking") | `verification` lite / standard / full; `budget.hours`, `budget.images`, `budget.scope_cuts` from the free text |
+| Guidance | *On my own* (default) / *Step by step* / *Step by step, I know C++* / *Just show me results* | `guidance` + `experience` + `budget.scope_cuts` (setup SKILL.md, Step 2) + `verification`: `lite` for *On my own* / *Just show me results*, `full` for both *Step by step* answers |
+| AI tools and subscriptions | multi-select + free text | `resources.have` / `resources.note`; then `art.source` (follow-up only when more than one route), `art.provider`, `art.animation` / `art.animation_provider` (an image-to-video service named in the free text), `data_policy` (`profile_provider.data_policy_for`) |
+| Free text in any answer (no question of its own) | "check everything thoroughly" / "check it more but not every detail" / hours / a maximum of pictures / "cut without asking" | `verification` `full` / `standard`; `budget.hours`, `budget.images`, `budget.scope_cuts` |
 | Install the build components (not on *Art only*) | *Install them* / *Not now* | `~/.wowcube/config.json` `install_consent`; *Not now* stops every build until the user agrees |
 
 An older project file may still carry `budget.usage` (`lean|normal|unlimited`): it is ignored.

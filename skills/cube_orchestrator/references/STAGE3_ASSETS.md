@@ -93,6 +93,13 @@ cannot judge (sizes that read like on-screen pixels, panoramas, the sound plan):
 - **Across faces**: scenery that spans faces is one panorama split per screen,
   continuous and upright around the four side faces; unique objects (sun, moon)
   appear exactly once on the cube.
+- **Animation from video** (optional): only when the user named an image-to-video service at setup
+  (`art.animation: "video"`) or asks for it, its connector's tools are in the session and they agreed to
+  the quoted credits once for this run. Then looping idles, walk/run cycles and short in-place actions are
+  animated from the approved first frame and cut with `scripts/video_to_frames.py`; the frames get
+  `"fit": "canvas"` and the same `process` / `qa` / review. A video job counts in the image budget as the
+  frames it replaces (`art.py budget M --video <anim>`, before it is submitted).
+  `cube_art-director/references/ANIMATION_VIDEO.md`.
 - **Animation**: 20 fps is the hardware cap; there is no pack-size or clip-length
   budget (many frames, even video sequences, are fine). "One animated full-screen
   (fullsize) picture per physical module" is a guideline (unconfirmed), informational
