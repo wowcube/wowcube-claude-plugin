@@ -12,8 +12,10 @@ How:
   * the simulator's gyro is the scene rotation of each frame, paid out evenly over that frame (~16.7 ms headless).
     One MCP `turn` is applied in one frame, and a reply comes back on that frame, so sending the next `turn` the
     moment the reply arrives turns the cube once per frame: a steady rate, the way a hand turns it.
-  * a pulse is PULSE_TURNS x `turn STEP 0 0` = 1080 deg of yaw (three whole turns, so the cube ends where it started),
-    ~0.6 s at 60 fps = ~1800 deg/s, well above the threshold for the whole 300 ms window (and above it still at 30 fps).
+  * a pulse is 1080 deg of yaw (three whole turns, so the cube ends where it started): 36 x `turn 30 0 0`, ~0.6 s at
+    60 fps = ~1800 deg/s, well above the threshold for the whole 300 ms window. The rate is step / frame time, so
+    each pulse first times a few frames and takes a bigger step on a slow run (pick_step: 30..120 deg, still whole
+    turns): below ~21 fps a 30 deg step stays under 625 deg/s, and on a slow Linux run battery save paused the game.
     A pulse must last longer than that window: when the replies come faster than MIN_PULSE_S (0.4 s) for the whole
     pulse, the turns are paced so the pulse still lasts MIN_PULSE_S, and the log line says so.
   * yaw is a rotation about the WORLD vertical, so gravity in cube space - what the accelerometer, the tilt API and a
@@ -45,8 +47,12 @@ import socket
 import sys
 import time
 
-STEP_DEG = 30
+STEP_DEG = 30              # the step at normal frame rates (pick_step makes it bigger on slow runs)
 PULSE_TURNS = 36            # 36 x 30 = 1080 deg: three whole turns, the pose comes back exactly
+PULSE_DEG = STEP_DEG * PULSE_TURNS
+STEPS_DEG = (30, 45, 60, 90, 120)   # every one divides PULSE_DEG, so the pose always comes back
+TARGET_DPS = 1500.0         # well above the engine's 625 deg/s (summed over the axes) sustained-movement threshold
+LOW_DPS = 800.0             # a pulse slower than this is logged as a WARNING: battery save may not be held off
 MIN_PULSE_S = 0.4           # longer than the engine's 300 ms sustained-movement window, with a margin
 REPLY_TIMEOUT_S = 10.0
 RECONNECT_S = 5.0           # a connection that cannot be opened again within this time = the run ended
@@ -124,26 +130,53 @@ class TurnFailed(RuntimeError):
     pass
 
 
+def pick_step(frame_s):
+    """The yaw step per frame that turns the cube at TARGET_DPS or faster at this frame time (largest step: 120 deg).
+
+    The simulator pays a frame's turn out over that frame, so the rate the engine sees is step / frame time: 30 deg
+    at 60 fps is 1800 deg/s, but on a slow headless run (software GL under xvfb, ~10-20 fps) the same step is
+    300-600 deg/s, under the engine's 625 deg/s, and battery save came anyway. Every step divides PULSE_DEG."""
+    for step in STEPS_DEG:
+        if step / max(frame_s, 1e-3) >= TARGET_DPS:
+            return step
+    return STEPS_DEG[-1]
+
+
+def frame_time(conn, probes=3):
+    """Seconds per simulator frame: each reply comes back on the frame that applied the command."""
+    conn.ask("turn 0 0 0")
+    t0 = time.perf_counter()
+    for _ in range(probes):
+        reply = conn.ask("turn 0 0 0")
+        if not reply.startswith("ok"):
+            raise TurnFailed("pose read failed: " + reply)
+    return (time.perf_counter() - t0) / probes
+
+
 def pulse(conn, min_s=MIN_PULSE_S):
-    """One keep-alive pulse. Returns (ms, pose_before, pose_after, paced). Raises TurnFailed on a non-ok reply."""
+    """One keep-alive pulse. Returns (ms, pose_before, pose_after, paced, step, dps). Raises TurnFailed on a non-ok
+    reply. dps is the measured yaw rate (deg/s of the whole pulse)."""
+    frame_s = frame_time(conn)
+    step = pick_step(frame_s)
+    turns = PULSE_DEG // step
     before = conn.ask("turn 0 0 0")          # a zero turn only reads the pose: "ok cube <yaw> <pitch> <roll>"
     if not before.startswith("ok"):
         raise TurnFailed("pose read failed: " + before)
     t0 = time.perf_counter()
     paced = False                            # perf_counter: monotonic() ticks in ~16 ms on Windows
-    for i in range(PULSE_TURNS):
-        reply = conn.ask("turn %d 0 0" % STEP_DEG)
+    for i in range(turns):
+        reply = conn.ask("turn %d 0 0" % step)
         if not reply.startswith("ok"):
-            raise TurnFailed("turn %d of %d answered %r" % (i + 1, PULSE_TURNS, reply))
-        # never faster than min_s for the whole pulse: turn i+1 is due at t0 + (i+1) * min_s / PULSE_TURNS
-        due = t0 + (i + 1) * min_s / PULSE_TURNS
+            raise TurnFailed("turn %d of %d answered %r" % (i + 1, turns, reply))
+        # never faster than min_s for the whole pulse: turn i+1 is due at t0 + (i+1) * min_s / turns
+        due = t0 + (i + 1) * min_s / turns
         wait = due - time.perf_counter()
         if wait > 0:
             paced = True
             time.sleep(wait)
-    ms = int((time.perf_counter() - t0) * 1000)
+    secs = time.perf_counter() - t0
     after = conn.ask("turn 0 0 0")
-    return ms, before, after, paced
+    return int(secs * 1000), before, after, paced, step, PULSE_DEG / max(secs, 1e-3)
 
 
 def connect(port, wait_s):
@@ -177,8 +210,9 @@ def main(argv=None):
         log_line(a.log, "keepalive: ERROR: no simulator on 127.0.0.1:%d (%s): battery save is NOT held off" % (a.port, err))
         set_run_info(a.run_info, "failed")
         return 1
-    log_line(a.log, "keepalive: connected to 127.0.0.1:%d; a %d deg yaw pulse (%d x turn %d 0 0, at least %d ms) every %g s, "
-             "first after %g s" % (a.port, STEP_DEG * PULSE_TURNS, PULSE_TURNS, STEP_DEG, MIN_PULSE_S * 1000, a.period, a.first))
+    log_line(a.log, "keepalive: connected to 127.0.0.1:%d; a %d deg yaw pulse (%d..%d deg a frame, chosen from the "
+             "frame time; at least %d ms) every %g s, first after %g s"
+             % (a.port, PULSE_DEG, STEPS_DEG[0], STEPS_DEG[-1], MIN_PULSE_S * 1000, a.period, a.first))
     n = 0
     fails = 0
     next_at = time.monotonic() + a.first
@@ -199,7 +233,7 @@ def main(argv=None):
                         return 0
             started = time.strftime("%H:%M:%S")
             try:
-                ms, before, after, paced = pulse(conn)
+                ms, before, after, paced, step, dps = pulse(conn)
             except (OSError, ConnectionError, TurnFailed) as e:
                 fails += 1
                 level = "ERROR" if fails >= FAILING_AFTER else "WARNING"
@@ -230,9 +264,14 @@ def main(argv=None):
                 note += "  (paced: the replies came faster than %d ms a pulse)" % (MIN_PULSE_S * 1000)
             if ms < 300:
                 note += "  WARNING: shorter than the engine's 300 ms sustained-movement window"
+            if dps < LOW_DPS:
+                note += ("  WARNING: %d deg/s is too slow to count as handling (the engine needs about 625; the "
+                         "frames were slower than this pulse's %d deg step can make up for): battery save may pause "
+                         "the game, tap before acting" % (dps, step))
             if not same:
                 note += "  WARNING: pose changed"
-            log_line(a.log, "keepalive: pulse %d took %d ms, started %s (%s -> %s)%s" % (n, ms, started, before, after, note))
+            log_line(a.log, "keepalive: pulse %d took %d ms at %d deg a frame, %d deg/s, started %s (%s -> %s)%s"
+                     % (n, ms, step, dps, started, before, after, note))
             set_run_info(a.run_info, True)
             next_at += a.period
             if next_at < time.monotonic():          # after retries: the next pulse a full period from now

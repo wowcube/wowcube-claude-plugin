@@ -120,10 +120,18 @@ it needs", on any machine, typically a clean one), and replaces Step 0 and Steps
   packages when Homebrew is there. What only the user can do (macOS `xcode-select --install` opens Apple's
   installer; installing Homebrew and Linux package lines need their password): one plain line with the
   exact command, wait, then go on.
-- **Check, then hand over.** Run `check_env` again. All ok → "Everything is installed. Close Claude Code
-  if it is open, open it in a folder for your games, start a new session and say 'I want to make a game
-  for my WowCube'." Then stop: nothing else is started in this session (no entry, no game). Something still missing → Step 2b's "No
-  admin rights, a declined Windows prompt, or a failed install" rule.
+- **Check, then hand over.** Run `check_env` again (`check_env.ps1` re-reads PATH from the registry itself,
+  so programs installed a minute ago are found in this session too). All ok → "Everything is installed.
+  Close Claude Code if it is open, open it in a short folder for your games (e.g. C:\games or ~/games),
+  start a new session and say 'I want to make a game for my WowCube'." Then stop: nothing else is started
+  in this session (no entry, no game). An item the installer reported as installed but this check still
+  misses is not a failure: say the new session will find it (never tell the user to install it by hand).
+  An item whose install failed (`[FAILED]`) → Step 2b's "No admin rights, a declined Windows prompt, or a
+  failed install" rule.
+- **The same request with a game under way** ("install" after *Not now*, while `<ws>` holds a profile or
+  a game's context): this is the Step 2b yes for that game, not a fresh setup. Install the same way, then
+  end with "close Claude Code, open it again in this same folder, start a new session and say 'continue':
+  we go on with your game" (never "I want to make a game": that starts a new one).
 
 ## Step 1: detect (read-only, before any question)
 
@@ -177,8 +185,10 @@ answer ("Other"); a host without it asks the same questions as a short numbered 
    - *Art only* — "I want sprites, a sprite sheet, icons or backgrounds in one consistent style, no game
      code" (`entry: art`). No game is designed, coded or built: the art director works with the user
      directly (Step 2c) and delivers PNG files and a sprite sheet. This path never needs the build-check
-     components, the ARM toolchain or a C++ compiler, and never asks to install them.
-2. **Guidance** — "How should I work with you?" The answer also sets how each step is checked
+     components, the ARM toolchain or a C++ compiler, and never asks to install them (only Python, when it is
+     missing: Step 2c).
+2. **Guidance** — "How should I work with you? (This also sets how carefully each step is checked.)" The
+   question says it in those words, so nobody looks for a separate "how thorough" question. The answer sets how each step is checked
    (`verification`, `profile_provider.verification_for_guidance`); there is no separate question about
    checking and no "less careful" choice. Every option's description says the consequence in time and
    usage, from `cube_orchestrator/references/RUN_MODES.md` ("Estimate"), as an estimate, never a plan
@@ -237,7 +247,7 @@ an option); "quick" or "fast" → `lite` (the one-or-two-step game, never fewer 
 pictures → `budget.hours` / `budget.images`; "cut what you need without asking" → `budget.scope_cuts:
 auto`. Nothing makes the checking lighter than *On my own*.
 On *Art only* the guidance answer sets the picture budget and the number of fresh art reviews the same
-way (*On my own* / *Just show me results*: 30 pictures and 2 reviews; *Step by step*: 200 and 5; an
+way (*On my own* / *Just show me results*: 30 pictures and 1 review; *Step by step*: 200 and 5; an
 explicit `standard`: 80 and 3).
 
 ### Step 2a: follow-ups (a second short call, only what the first answers need)
@@ -311,7 +321,10 @@ that build and check games; about N GB to download, about M minutes). OK to inst
 
 - *Install them* (recommended: every build is checked automatically).
 - *Not now* — then say plainly: "Without these components I can't build or check the game, so I'll stop
-  here. Say 'install' when you're ready." Stop until they agree; nothing is built, nothing else is asked.
+  here. Everything so far is saved: say 'install' when you're ready, and we go on with this game." Stop
+  until they agree; nothing is built, nothing else is asked. Their later "install" (in this or a new
+  session) is this question's yes: install, restart, continue with the same game (Environment-only
+  install, "The same request with a game under way").
 
 Fill the question from `check_env`'s `[MISSING]` lines, in plain words:
 - Python 3.12 and its packages are installed like the other tools (Windows: per user, no admin rights;
@@ -356,7 +369,9 @@ Fill the question from `check_env`'s `[MISSING]` lines, in plain words:
   still ask to accept its agreements unless the user accepted them: `-AcceptAgreements`). Record
   `install_consent: {"answer": "yes"|"not_now", "date": ...}` in `~/.wowcube/config.json` (the one shape,
   `references/PROFILE.md`; merge, keep the other keys); on *Not now* ask again only when the user brings it
-  up or starts a build.
+  up or starts or resumes a build: an entry with `install_consent: not_now` and a build request asks this
+  question again (one line on why) before anything else, never silently goes on and never re-runs the
+  whole setup.
 - **Nothing starts before the yes** (design included; only *Art only* needs none of it). Once the user
   agreed, while the installs run or wait for something only the user can do (a package line, an
   administrator prompt), the design and the art may go on; nothing is built before the installs are done
@@ -377,9 +392,18 @@ Fill the question from `check_env`'s `[MISSING]` lines, in plain words:
 
 ### Step 2c: *Art only* (`entry: art`)
 
-No game, no build, no install question. What it needs: Python with Pillow and numpy (`art.py doctor
---no-codex` checks them when the art is drawn in code or is the user's own; plain `art.py doctor` when
-Codex draws), and the drawing route from the tools answer. Route to `cube_art-director` standalone
+No game, no build, no question about the build components. What it needs: Python with Pillow and numpy
+(`art.py doctor --no-codex` checks them when the art is drawn in code or is the user's own; plain `art.py
+doctor` when Codex draws), and the drawing route from the tools answer. When Python or those packages are
+missing (a clean computer), ask one small question instead of stopping: **"To draw and check the pictures
+I need Python on this computer (about 150 MB, a few minutes, no administrator rights). OK to install it?"**
+Yes → only Python and the packages: Windows `winget install --id Python.Python.3.12 -e --scope user
+--silent`, then that Python's `-m pip install -r <skills>/scripts/requirements.txt` (the per-user Python
+is at `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`: call it by that full path in this session,
+`python` on the old PATH does not find it until a restart); Linux/macOS the
+`~/.wowcube/venv` venv (`python3 -m venv ~/.wowcube/venv`, its pip, the same requirements; a missing
+`python3` / `python3-venv` is the one package line the user runs). Never the build components on this
+path. *Not now* → say plainly that the pictures cannot be made without it, and stop. Route to `cube_art-director` standalone
 ("Art only", its SKILL.md): the user is the artist (style lock with them, generation through what they
 have or drawn in code, strict QA), and the delivery is PNG files, a sprite sheet with its atlas
 (`art.py sheet`), and on request a cube-packed asset set. The guidance answer sets the picture budget
@@ -418,7 +442,9 @@ a new session resumes from these files, never from the chat.
    new game, I work on my own and stop to show you the look and, at the end, to ask about the install
    link; pictures drawn in code, sounds made in
    code; every step checked by two reviewers and an automatic playtest: about 45–75 minutes and about 1
-   million tokens for a simple game (my estimate). Change anything? Say 'change my settings'." Art only: "Sprites for your
+   million tokens for a simple game (my estimate). A game can take more than one usage window of your
+   Claude plan: if the limit runs out, everything is saved, and you say 'continue' when it resets. Change
+   anything? Say 'change my settings'." Art only: "Sprites for your
    game, drawn in code in one style, I show you the look and the finished set: about a minute per picture
    plus the reviews; you get PNGs and a sprite sheet."
 4. Return to `cube_orchestrator` with the resolved snapshot (`references/PROFILE.md`, "Resolution").

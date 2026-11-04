@@ -58,7 +58,10 @@ which sections were used. A rule broken on purpose is listed there too, with the
 
 ### Test hooks and delivery
 - An **autoplay bot** switch: the game plays itself (screenshots, balance runs, the
-  gameplay video). It exercises every mechanic and restarts rounds on its own.
+  gameplay video). It exercises every mechanic, restarts rounds on its own and loses
+  some rounds on purpose, so the death and retry path is seen too.
+- A **scene** switch: each round starts one move from its win, or one step from its loss,
+  so a short check reaches the ending of a long level or a maze.
 - A **mute** switch for test builds.
 - A **playfield pin**: forces the playfield to one face (screenshots without tilting).
   Games without a playfield face keep it unused.

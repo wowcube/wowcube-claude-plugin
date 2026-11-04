@@ -72,7 +72,7 @@ Codex draws). Talk about pictures only; no "manifest", "pack" or other pipeline 
    Guidance *Just show me results*: they see the style frame (with the bible's one-line summary) and the
    finished set; family leaders go to a fresh reviewer instead. The guidance answer sets the picture
    budget (`"budget": {"images": N}` in `art.json`) and the fresh reviews: *On my own* / *Just show me
-   results* 30 pictures and 2 reviews, *Step by step* 200 and 5 (an explicit `standard` request: 80 and 3).
+   results* 30 pictures and 1 review, *Step by step* 200 and 5 (an explicit `standard` request: 80 and 3).
 4. **Delivery**: the exact-size PNGs in `<ws>/art_work/final/`, a sprite sheet and its atlas
    (`art.py sheet art.json`, one per set with `--set <set>` when they want one per animation), the QA
    sheet and the review page. On request, a cube-ready asset set: write a WowCube manifest for the same

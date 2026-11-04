@@ -73,11 +73,25 @@ reason to `context/rules.md` and pass the relevant lines into every brief
 
 ### 0. Profile and starting point
 
+**A short, lasting game folder first** (every path that makes or changes a game; not for a question or an
+environment-only install). Before setup, design or any file is written, look at `<ws>`: its full path longer
+than 80 characters, or a folder the app made only for this session (Claude desktop's session folder, a
+temporary or "scratch" folder), means the game cannot stay there: builds and checks create files about 120
+characters deeper, Windows tools fail past 260, and the app deletes its session folders with the session (a
+real run had to stop after design and move a 180-character session folder). Ask once, in plain words, for a
+short folder of the user's own (e.g. `C:\games\<name>` or `~/games/<name>`) and move there: in the Claude
+desktop app with its folder tools (the user picks or approves the folder, the session moves with its files);
+in a terminal, the user opens Claude Code in that folder and says the same again. Then go on from there.
+
 **Environment-only install first.** A request only to set up or install ("set up the environment",
 "install everything", "install the WowCube plugin and everything it needs", in any language) goes to
 `wowcube-setup`, "Environment-only install", whatever the profile says: it installs every component with
 no questions (the request is the install consent) and ends with the restart line. Then STOP: no starting
-point, no entry route, no game, nothing else in this session.
+point, no entry route, no game, nothing else in this session. One exception: "install" after the user
+answered *Not now* to the install question, while `<ws>` holds a profile or a game's context, is that
+question's yes for the game under way: the same install, then a restart line that ends with "say
+'continue'", and the next session resumes that game (`wowcube-setup`, "The same request with a game under
+way").
 
 Resolve the profile (`wowcube-setup/references/PROFILE.md`, "Resolution"): the request, the context,
 `<ws>/wowcube.project.json`, `~/.wowcube/config.json`, role defaults. No `config.json` or no
@@ -327,7 +341,8 @@ use as many testable slices as the game needs. Recompute the estimate from the p
 (`references/RUN_MODES.md`, "Estimate") and say it in one line if it changed. Accept its output only when:
 - every prompt has a Verification section and depends only on earlier prompts;
 - the **test hooks** come in one of the first prompts: `<GAME>_DEBUG_AUTOPLAY`,
-  `<GAME>_MUTE`, `<GAME>_DEBUG_PLAYFIELD_FACE`, default off and `#ifndef`-guarded, with every
+  `<GAME>_MUTE`, `<GAME>_DEBUG_PLAYFIELD_FACE`, `<GAME>_DEBUG_SCENE` (a round starts next to its
+  win or its loss), default off and `#ifndef`-guarded, with every
   sound going through one helper that compiles to nothing under the mute hook. Record
   the names in the context (`test_hooks`);
 - `python <skills>/scripts/build_pipeline.py validate --manifest plans/<game>_assets.json`
@@ -400,8 +415,8 @@ Read `references/STAGE3_ASSETS.md`, then run its steps in order:
    recordings (`cc0`): CC0 recordings downloaded after the user approved the list, built with
    `sound_kit.py build`, music with `sound_kit.py loop`, licences in `app_<game>/sound/CREDITS.md`
    (synthesis fills what is not approved). Either way judged by `sound_kit.py inspect` (never played).
-5. **Launcher icon** in the game's style (160×160 RGBA flat-top hexagon badge) →
-   `app_<game>/art/icon.png`. The default packed icon is full colour (RAW565: its
+5. **Launcher icon** in the game's style: a square picture cut into the launcher's standard hexagon by
+   `scripts/icon_badge.py make` (never a drawn hexagon) → `app_<game>/art/icon.png`. The default packed icon is full colour (RAW565: its
    transparent corners render black on the dark launcher); transparent corners need the
    manifest's `icon` object at palette 120 or 240 (API.md, Art tiers).
 6. **Fonts**: the template's BMFonts unless the GDD asks for others.
@@ -562,6 +577,12 @@ Read `references/DELIVERY.md`. In short:
 
 Then the end-of-run report (`references/RUN_MODES.md`), written to `context/<game>_report.md` and shown in the
 chat.
+
+**No reminders left behind.** Never schedule wake-ups or reminders to wait for a subagent or a background
+run: their results arrive by themselves. If one was scheduled anyway (a host tool such as ScheduleWakeup, a
+loop, a cron task), cancel every pending one before the report: a real run delivered the game, and then two
+stale "continue the build: run the audio check..." reminders fired into the user's finished session. The
+same before any stop that ends the run (a blocker, a spent budget).
 
 ## Mod mode
 

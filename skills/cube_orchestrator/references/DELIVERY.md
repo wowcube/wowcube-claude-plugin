@@ -8,7 +8,7 @@ steps below starts a simulator.
 
 - [ ] The last visual gate passed on the final source.
 - [ ] Test hooks off in `app_<game>/src/app_<game>.h`: `<GAME>_DEBUG_AUTOPLAY 0`,
-      `<GAME>_MUTE 0`, `<GAME>_DEBUG_PLAYFIELD_FACE -1`. (`build_game -Define` switched them on
+      `<GAME>_MUTE 0`, `<GAME>_DEBUG_PLAYFIELD_FACE -1`, `<GAME>_DEBUG_SCENE 0` (when the game has it). (`build_game -Define` switched them on
       only in its own snapshot of `src/`.)
 - [ ] The launcher icon is the game's: `app_<game>/art/icon.png` is not the template
       icon, and the last pack printed no template-icon warning. An extracted game (Mod mode)

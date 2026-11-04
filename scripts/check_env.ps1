@@ -44,6 +44,12 @@ param(
 # this script would inherit; on Windows PowerShell 5.1 a native tool writing to stderr under `2>$null` (git, gh,
 # ...) then raises a terminating NativeCommandError. This scope only.
 $ErrorActionPreference = 'Continue'
+# Programs installed a minute ago (by -Install, the one-command installer or winget in this same session) are on
+# the registry PATH, not on this process's inherited one: append the registry entries, so a check right after an
+# install finds them instead of reporting them MISSING (the session's own entries stay first).
+$regPath = @([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User')) |
+    Where-Object { $_ }
+if ($regPath) { $env:Path = (@($env:Path) + $regPath) -join ';' }
 
 function Step($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Have($exe) { return [bool](Get-Command $exe -ErrorAction SilentlyContinue) }
@@ -115,20 +121,26 @@ if (Have 'uv') { Info "uv found (only octpack-build against an optional octavios
 
 # --- assets ----------------------------------------------------------------
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
+# usable = 3.11..3.14 (the pinned numpy needs 3.11; on 3.13/3.14 psd-tools has no ready-made wheel, and -Install
+# falls back to a per-user 3.12 when building it fails). $pyOld means "not usable": too old or too new. A Python without pip (seen on a pre-installed 3.14) is usable: -Install runs ensurepip.
 $pyOld = $false
-if ($python) { & $python -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>$null; $pyOld = ($LASTEXITCODE -ne 0) }
+if ($python) { & $python -c "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 14) else 1)" 2>$null; $pyOld = ($LASTEXITCODE -ne 0) }
 # -Install puts Python in for this user (a per-user winget install: no admin rights needed), then its packages (PIP)
 $pipFix = "python -m pip install -r $repo\scripts\requirements.txt"
 if (-not $python -or $pyOld) {
-    $why = if ($python) { "python 3.11+ (pipeline scripts; $python is older, the pinned numpy needs 3.11)" } else { "python 3.11+ (pipeline scripts)" }
+    $why = if ($python) { "python 3.11-3.14 (pipeline scripts; $python is outside that range: the pinned packages need 3.11-3.14)" } else { "python 3.11+ (pipeline scripts)" }
     Miss $why "winget install --id Python.Python.3.12 -e --scope user (or python.org; the Microsoft Store build works too, see README)" 'Python.Python.3.12'
     [void]$missing.Add(@{ What = "python packages (scripts\requirements.txt)"; Fix = $pipFix; Pkg = 'PIP' })
 }
 else {
-    $code = "import importlib.util as u; print(' '.join(m for m in ['PIL', 'numpy', 'pytoshop', 'psd_tools', 'requests', 'segno'] if u.find_spec(m) is None))"
+    $code = "import importlib.util as u; print(' '.join(m for m in ['PIL', 'numpy', 'pytoshop', 'six', 'psd_tools', 'requests', 'segno'] if u.find_spec(m) is None))"
     $absent = (& $python -c $code 2>$null) -join ''
     if ($LASTEXITCODE -ne 0) { Warn "could not query python packages with $python" }
-    elseif ($absent.Trim()) { Miss "python packages: $($absent.Trim())" $pipFix 'PIP' }
+    elseif ($absent.Trim()) {
+        & $python -m pip --version *> $null
+        $noPip = if ($LASTEXITCODE -ne 0) { " (this python has no pip: -Install adds it with ensurepip first)" } else { "" }
+        Miss "python packages: $($absent.Trim())$noPip" $pipFix 'PIP'
+    }
     else { Ok "python + Pillow/numpy/pytoshop/psd-tools/requests/segno ($python)" }
     $prefix = (& $python -c "import sys; print(sys.prefix)" 2>$null) -join ''
     if ($python -like '*\WindowsApps\*' -or $prefix -like '*PythonSoftwareFoundation*') {
@@ -210,14 +222,48 @@ if ($pipItem) {
     $py = if ($python -and -not $pyOld) { $python } else { $null }
     if (-not $py) {
         $cand = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs\Python') -Filter python.exe -Recurse -Depth 1 -ErrorAction SilentlyContinue |
-                Where-Object { $_.DirectoryName -match 'Python3(1[1-9]|[2-9]\d)$' } | Sort-Object FullName -Descending | Select-Object -First 1
+                Where-Object { $_.DirectoryName -match 'Python31[1-4]$' } | Sort-Object FullName | Select-Object -First 1
         if ($cand) { $py = $cand.FullName }
     }
+    # the fallback: a per-user Python 3.12, the one every pinned package has a ready-made Windows wheel for
+    # (psd-tools 1.9.34 has none past 3.12: on 3.13/3.14 pip builds it from source, which needs a C compiler)
+    $own = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+    function Get-OwnPython {
+        if (-not (Test-Path $own)) {
+            Step "Installing Python 3.12 for this user (no admin rights needed)"
+            winget install --id Python.Python.3.12 -e --scope user @agree --silent | Out-Host
+        }
+        if (Test-Path $own) { return $own } else { return $null }
+    }
+    if ($py) {
+        # some Pythons come without pip (a pre-installed 3.14 had none): add it first, else the per-user 3.12
+        & $py -m pip --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Step "Adding pip to $py (ensurepip)"
+            & $py -m ensurepip --upgrade --default-pip | Out-Host
+            & $py -m pip --version *> $null
+            if ($LASTEXITCODE -ne 0) { $py = Get-OwnPython }
+        }
+    } else { $py = Get-OwnPython }
+    $ok = $false
     if ($py) {
         Step "Installing the Python packages (scripts\requirements.txt) with $py"
         & $py -m pip install --disable-pip-version-check -r (Join-Path $repo 'scripts\requirements.txt') | Out-Host
-        if ($LASTEXITCODE -ne 0) { [void]$failed.Add($pipItem) }
-    } else { [void]$failed.Add($pipItem) }
+        $ok = ($LASTEXITCODE -eq 0)
+        if (-not $ok -and $py -ne $own) {
+            # a newer Python that cannot build a pinned package here: the per-user 3.12 takes over
+            $py = Get-OwnPython
+            if ($py) {
+                Step "Installing the Python packages with $py"
+                & $py -m pip install --disable-pip-version-check -r (Join-Path $repo 'scripts\requirements.txt') | Out-Host
+                $ok = ($LASTEXITCODE -eq 0)
+            }
+        }
+    }
+    if (-not $ok) { [void]$failed.Add($pipItem) }
+    elseif ($python -and $py -ne $python) {
+        Warn "the pipeline's Python is now $py; 'python' on PATH ($python) is another one: run the pipeline's scripts with $py"
+    }
 }
 if ($failed.Count) {
     # no admin rights, a declined Windows prompt or no network: name exactly what is still needed and where it comes from

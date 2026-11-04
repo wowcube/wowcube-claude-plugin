@@ -148,10 +148,13 @@ Default: one face = `[240, 240]`, grid `[2, 2]`, left and right edges tiling sea
 
 ## Launcher icon
 
-160×160 RGBA, a **flat-top hexagon badge** (horizontal top and bottom edges, points left and right — the outline of `<skills>/templates/app_ai_template/art/icon.png`), transparent outside the hexagon, in the game's style.
+160×160 RGBA in the launcher's **standard flat-top hexagon**: every icon on the launcher uses the same hexagon
+(x 8..151, y 15..144 of the canvas, its exact edge in `<skills>/templates/app_ai_template/art/icon_mask.png`).
+Never draw the hexagon: a drawn one (by Codex, a model or a drawing script) comes out bigger or smaller than the
+other icons on the cube. Draw a square picture; the tool cuts the badge.
 
-1. The manifest carries it as the sprite `launcher_icon` (`icon` is reserved): `[160, 160]`, `color: "palette"` + `flags.fullsize` (so the PNG keeps its transparent corners through processing), `background: "key"`, `group: "icon"`. It is drawn with the set (`ART gen`/`process`), so the anchors and the Prompt block apply.
-2. Check it like any asset, plus: the four corners transparent in the PNG, flat top and bottom edges, points left and right, readable at 80 px. If the badge outline breaks the style palette on purpose, add `"@style_exempt": ["launcher_icon"]` to `fixes.json` and note it under "Approved exceptions" in STYLE.md.
-3. Copy `assets_<game>/art/launcher_icon.png` to `app_<game>/art/icon.png` (replacing the template icon) and pack with `--icon app_<game>/art/icon.png`; the pack builds the launcher's `ico` map from it.
+1. The manifest carries the picture as the sprite `launcher_icon` (`icon` is reserved): `[160, 160]`, `color: "palette"` + `flags.fullsize`, `background: "key"`, `group: "icon"`, its `gen_prompt` a square picture filled edge to edge (subject large and centred, no frame, no badge shape, no text). It is drawn with the set (`ART gen`/`process`, or the drawing script), so the anchors and the Prompt block apply.
+2. Cut the badge: `python <skills>/scripts/icon_badge.py make assets_<game>/art/launcher_icon.png --out app_<game>/art/icon.png` (`--bg "#RRGGBB"`: the backdrop where the picture is transparent, a dark colour from STYLE.md's palette; `--zoom 1.2` crops tighter). Look at it at 80 px: the subject must read. If the badge breaks the style palette on purpose, add `"@style_exempt": ["launcher_icon"]` to `fixes.json` and note it under "Approved exceptions" in STYLE.md.
+3. `python <skills>/scripts/icon_badge.py check app_<game>/art/icon.png` exits 0 (the pack warns when it does not), then pack with `--icon app_<game>/art/icon.png`; the pack builds the launcher's `ico` map from it.
 4. **The packed tier decides whether the corners stay transparent.** The manifest's top-level `icon` object picks it: the default, full color 160, is RAW565 with no transparency, so the corners render black on the dark launcher (a black square around the hexagon). Real transparent corners need `"icon": {"color": "palette", "side": 120}` (drawn ×2) or `240` (fullsize): the packer resizes the PNG to that side and keeps its alpha as palette index 0. Changing the `icon` object is a manifest change (Stage 2).
 5. A manifest made before this rule has no `launcher_icon`: ask Stage 2 to add the entry (never hand-edit the manifest here).

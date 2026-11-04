@@ -263,11 +263,12 @@ against both. When they disagree with an older habit, they win.
   `<GAME>_MUTE` (a direct `SND_play` bypassing it: **minor**); `SND_play_quad` for sounds
   that belong to a place; music retriggered from `on_tick` (no loop API); no branching on
   `SND_play`'s return value (**major**).
-- **Test hooks.** Once the prompt that adds them is done, the game header carries the three
+- **Test hooks.** Once the prompt that adds them is done, the game header carries the
   hooks named in the brief's `test_hooks` (the context's record): `autoplay`
-  (`<GAME>_DEBUG_AUTOPLAY`, default 0), `mute` (`<GAME>_MUTE`, default 0) and `plane_pin`
+  (`<GAME>_DEBUG_AUTOPLAY`, default 0), `mute` (`<GAME>_MUTE`, default 0), `plane_pin`
   (`<GAME>_DEBUG_PLAYFIELD_FACE`, or `<GAME>_DEBUG_ROOM_PLANE` in an older game that recorded it;
-  default -1), each `#ifndef`-guarded, with the defaults in the source. A name that differs from
+  default -1) and, when recorded, `scene` (`<GAME>_DEBUG_SCENE`, default 0: 1 starts each round one
+  move from the win, 2 one step from the loss, through the game's own rules), each `#ifndef`-guarded, with the defaults in the source. A name that differs from
   the recorded one, missing, unguarded, or left at a test value: **major** (the visual gate and the
   shipped build depend on them).
 - **Builds on both targets.** ARM: `-Werror`, no `double`, no `%f`/`%x` or floats in
@@ -335,7 +336,7 @@ annotation, rule and pitfall in them.
    pushed only by OCT_add/OCT_add_label, x2 sizes for non-fullsize sprites,
    appTapQuad with a -1 fallback, sound through one play helper, the test hooks
    named in test_hooks (<GAME>_DEBUG_AUTOPLAY / <GAME>_MUTE / <GAME>_DEBUG_PLAYFIELD_FACE,
-   or the recorded legacy <GAME>_DEBUG_ROOM_PLANE; #ifndef-guarded, defaults 0 / 0 / -1), ARM and Windows-simulator build breakers, saves (the
+   or the recorded legacy <GAME>_DEBUG_ROOM_PLANE; <GAME>_DEBUG_SCENE when recorded; #ifndef-guarded, defaults 0 / 0 / -1 / 0), ARM and Windows-simulator build breakers, saves (the
    magic/version/size header, the static_assert of the wire size,
    OCT_save_sync in on_init or at safe boundaries, never per tick), no
    SIM_SINGLE_THREAD

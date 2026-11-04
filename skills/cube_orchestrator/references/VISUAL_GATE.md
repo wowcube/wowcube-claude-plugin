@@ -34,6 +34,7 @@ recorded in the context (`test_hooks`).
 | `<GAME>_DEBUG_AUTOPLAY` | `0` | `1` | the game starts by itself and a scripted bot plays it (input from a script instead of taps, twists and tilt) |
 | `<GAME>_MUTE` | `0` | `1` | every sound call compiles to nothing (one play helper) |
 | `<GAME>_DEBUG_PLAYFIELD_FACE` | `-1` | `0..5` | pins the playfield to one face, so frames show it without tilting the cube |
+| `<GAME>_DEBUG_SCENE` | `0` | `1` / `2` | every round starts one move from its win (1) or one step from its loss (2), through the game's own rules |
 
 Older games may still name the third hook `<GAME>_DEBUG_ROOM_PLANE` (same values). Keep the name the game uses
 and record it in the context's `test_hooks.plane_pin`; the build tools pass any define name, and the
@@ -48,6 +49,12 @@ Which build sets what:
 | Playtest Agent (interactive) | `0`: the agent's taps, twists and tilts are the only input | `1` | `-1`: the playfield follows the real tilt |
 | audio check (sound-event log) | `1` | `0` | as for the visual gate |
 | device / shipped | `0` | `0` | `-1` (Stage 5 checks) |
+
+`_DEBUG_SCENE` (when recorded) is `0` in every build above. When a check has not seen an ending it must
+show (the visual gate never saw the death or the win screen; the Playtest Agent lists the win or the loss
+under `not_observed`), run one short extra check with `_DEBUG_SCENE=1` or `2` for exactly that ending: a
+30-60 s gate run (autoplay on) for frames, or a second playtest of only those criteria (autoplay off).
+Never record the ending as "accepted, not seen", and never edit the source to get there.
 
 Before the hooks exist, run without them: a hidden run opens no audio device anyway.
 
@@ -237,16 +244,14 @@ tilt, so the agent's own taps, twists and tilts would prove nothing.
    powershell -NoProfile -ExecutionPolicy Bypass -File <skills>\tools\sim\run_hidden.ps1 -AppDir <ws>\app_<game> -Seconds 1500 -EveryMs 0 -McpPort 8177 -AllowEarlyStop -OutDir <ws>\assets_<game>\qa\sim\p03-play
    ```
 
-   Linux/macOS (as a background shell command too): `bash <skills>/tools/sim/run_hidden.sh <ws>/app_<game> --seconds 1500 --every-ms 0 --mcp-port 8177 --out-dir <ws>/assets_<game>/qa/sim/p03-play`;
-   it writes `<out-dir>/run_info.json` at the start (`ends_at`, `pid`) and adds `mcp_port` about a second later (also in
-   `<out-dir>/stdout.txt` and `<out-dir>/work/log_linux.txt`: `[mcp] control socket listening on 127.0.0.1:<port>`,
-   `SIM_MCP.md`); the instance ends itself after `--seconds`.
-   **Linux/macOS limitation:** there is no `stop.sh` and `run_hidden.sh` has no `--allow-early-stop`, so a
-   playtest instance there cannot be stopped early (stopping it by PID ends the run as a failure, and
-   `run_hidden.sh` is its watchdog). Pick a shorter lifetime that just covers the playtest (about 900 s;
-   the context's `playtest_seconds` when it is set lower or the game needs longer), tell the Playtest Agent
-   its `ends_at`, and wait for the instance to end by itself before the next hidden run (one instance at a
-   time). Never kill it by name.
+   Linux/macOS: the same, with `--allow-early-stop`: `bash <skills>/tools/sim/run_hidden.sh <ws>/app_<game>
+   --seconds <playtest_seconds> --every-ms 0 --mcp-port 8177 --allow-early-stop --out-dir
+   <ws>/assets_<game>/qa/sim/p03-play` (as a background shell command), stopped with `tools/sim/stop.sh
+   <out-dir>/run_info.json` in step 5. It writes `<out-dir>/run_info.json` at the start (`ends_at`, `pid`) and
+   adds `mcp_port` about a second later (also in `<out-dir>/stdout.txt` and `<out-dir>/work/log_linux.txt`:
+   `[mcp] control socket listening on 127.0.0.1:<port>`, `SIM_MCP.md`). One
+   instance at a time: start the next hidden run only after `stop` (or the run) has ended this one. Never kill
+   it by name.
 
 3. Connect through `run_info.json` (Windows): `mcp.ps1 -RunInfo` waits up to 30 s for the port
    (`mcp_port`, written about a second after the start, else the log line) and prints it:
@@ -264,9 +269,9 @@ tilt, so the agent's own taps, twists and tilts would prove nothing.
    the score does not cover the prompt; when the game starts a round at boot, give the
    playtest build a title or a paused start (a test hook) so the agent connects before
    anything is decided.
-5. Windows: stop the instance with `tools\sim\stop.ps1 -RunInfo <out dir>\run_info.json` (it stops only that
-   process: same PID, exe and start time, never a reused PID) as soon as the agent
-   returns, also on failure. Linux/macOS: wait for its lifetime to end (step 2).
+5. Stop the instance as soon as the agent returns, also on failure: Windows `tools\sim\stop.ps1 -RunInfo
+   <out dir>\run_info.json`, Linux/macOS `tools/sim/stop.sh <out dir>/run_info.json` (each stops only that
+   process: same PID and exe, never a reused PID, never by name).
 
 **Per-module skew in one frame.** The eight modules are threads that are not in lockstep (`simulator/README.md`,
 captures), so one frame can show a HUD value one tick apart on different screens (score 4 on FRONT, 5 on RIGHT) at

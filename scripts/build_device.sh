@@ -20,6 +20,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# the pipeline Python on Linux/macOS is ~/.wowcube/venv (install.sh makes it): system Pythons lack the packages
+[ -x "$HOME/.wowcube/venv/bin/python3" ] && PATH="$HOME/.wowcube/venv/bin:$PATH"
 PACK_PY="$SCRIPT_DIR/pack_beta.py"
 APP_DIR=''; OCTAVIOS=''; OUT=''; BUILDER='auto'; NO_UV=0; UV_ENV=''
 case "${WOWCUBE_NO_UV:-}" in 1|true|yes) NO_UV=1;; esac

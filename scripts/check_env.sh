@@ -93,7 +93,7 @@ if [ -x "$HOME/.wowcube/venv/bin/python3" ]; then PATH="$HOME/.wowcube/venv/bin:
 if have python3 && ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
     miss "python 3.11+ (python3 is older; the pinned numpy needs 3.11)" "see the install line below (python3, python3-venv, python3-pip), or uv python install 3.12"
 elif have python3; then
-    absent=$(python3 -c "import importlib.util as u; print(' '.join(m for m in ['PIL','numpy','pytoshop','psd_tools','requests','segno'] if u.find_spec(m) is None))")
+    absent=$(python3 -c "import importlib.util as u; print(' '.join(m for m in ['PIL','numpy','pytoshop','six','psd_tools','requests','segno'] if u.find_spec(m) is None))")
     if [ -n "$absent" ]; then miss "python packages: $absent" "python3 -m venv ~/.wowcube/venv && . ~/.wowcube/venv/bin/activate && pip install -r <skills repo>/scripts/requirements.txt (a venv: Homebrew and Debian/Ubuntu Python refuse a global pip install, PEP 668; activate it before running the pipeline)"
     else ok "python3 + Pillow/numpy/pytoshop/psd-tools/requests/segno"; fi
 else miss "python3 (3.11+)" "see the install line below (python3, python3-venv, python3-pip)"; fi

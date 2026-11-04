@@ -40,7 +40,7 @@ reviewers all get it, verbatim:
   "standing_rules": ["<lines from context/rules.md that apply>"],
   "profile": {"guidance": "autonomous", "experience": "new", "verification": "lite",
               "art": {"source": "procedural", "provider": null}, "data_policy": {"may_leave_machine": []}},
-  "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE"},
+  "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE", "scene": "<GAME>_DEBUG_SCENE"},
   "asset_facts": {"music_loop_ticks": 309},
   "files_to_read": [
     "<skills>/templates/app_ai_template/src/app_ai_template.h",
@@ -93,7 +93,7 @@ A prompt that adds saves or an optional callback also lists
     "<skills>/templates/app_ai_template/API.md"
   ],
   "prior_context": [],
-  "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE"},
+  "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE", "scene": "<GAME>_DEBUG_SCENE"},
   "mod_request": null,
   "profile": {"guidance": "autonomous", "experience": "new", "verification": "lite",
               "art": {"source": "procedural", "provider": null}, "data_policy": {"may_leave_machine": []}},
@@ -199,7 +199,9 @@ You are a WowCube game coder. Implement exactly what the task describes.
    logic on SND_play / SND_play_quad return values.
 7. Keep the test hooks (test_hooks) compiling and off by default. When this prompt adds
    a mechanic, extend the autoplay bot so a hidden run exercises it; the bot varies per
-   round (OCT_random or a round counter), never replays one fixed round.
+   round (OCT_random or a round counter), never replays one fixed round, and loses on
+   purpose in some rounds. When this prompt adds an ending (a win, a level clear, a game
+   over), the scene hook starts a round next to it.
 8. Use only BMP_* / SND names that exist in the ids header and the manifest. Never
    create assets, never edit the _ids.h file.
 9. Modular, readable code: state in structs, small functions, named constants; every
@@ -311,7 +313,7 @@ run. **This block is the one definition of the context's fields**; every other f
   "style_lock": {"status": "pending|approved|waived|user_art", "anchors": ["assets_<game>/style/anchors/hero_idle_00.png"], "date": "2026-10-28"},
   "art_source": "procedural|codex|own|provider|placeholder|original",
   "sound": {"source": "synth|cc0", "music_loop_ticks": 309, "credits": "app_<game>/sound/CREDITS.md"},
-  "test_hooks": {"autoplay": "FF_DEBUG_AUTOPLAY", "mute": "FF_MUTE", "plane_pin": "FF_DEBUG_PLAYFIELD_FACE"},
+  "test_hooks": {"autoplay": "FF_DEBUG_AUTOPLAY", "mute": "FF_MUTE", "plane_pin": "FF_DEBUG_PLAYFIELD_FACE", "scene": "FF_DEBUG_SCENE"},
   "sim_mcp": "wire|absent",
   "playtest_port": 8177,
   "playtest_seconds": 1500,
@@ -381,6 +383,6 @@ run. **This block is the one definition of the context's fields**; every other f
   (Stage 3); there is no top-level `music_loop_ticks`. A coding brief copies it into its
   `asset_facts.music_loop_ticks`.
 - `playtest_seconds` is the playtest instance's `-Seconds` lifetime (default 1500 when absent; raise it
-  for a long game; Linux/macOS, where an instance cannot be stopped early: about 900, `VISUAL_GATE.md`). `spend.images_used` is written by the image ledger (`art.py` / the paid path,
+  for a long game; on every OS the instance is stopped by PID when the playtest returns, `VISUAL_GATE.md`). `spend.images_used` is written by the image ledger (`art.py` / the paid path,
   `cube_art-director/scripts/art_budget.py`: `context/<game>_images.json` holds every request), never
   counted by hand.

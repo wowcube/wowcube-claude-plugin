@@ -673,7 +673,8 @@ def pipeline_findings(data: dict, m: Manifest) -> tuple[list[str], list[str]]:
         pass
     elif icon is None:
         errors.append(f"sprite {LAUNCHER_ICON_NAME!r} is missing - the launcher badge in the game's style "
-                      f"(flat-top hexagon, transparent corners); Stage 3 copies it to app_<game>/art/icon.png")
+                      f"(a square picture; Stage 3 cuts it into the standard hexagon with scripts/icon_badge.py "
+                      f"into app_<game>/art/icon.png)")
     elif not icon.keep:
         if icon.size[0] != icon.size[1]:
             errors.append(f"sprite {LAUNCHER_ICON_NAME!r}: size {list(icon.size)} must be square (the packer "

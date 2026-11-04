@@ -112,8 +112,9 @@ cannot judge (sizes that read like on-screen pixels, panoramas, the sound plan):
 - **Sounds**: one entry per event moment plus a music loop (unless the GDD explicitly
   says "no music"), same naming rules.
 - **Launcher icon**: one sprite `launcher_icon` (`icon` is reserved), `[160, 160]`,
-  `color: "palette"` + `flags.fullsize`, `background: "key"`: a flat-top hexagon badge in
-  the game's style with transparent corners in its PNG. The **packed** tier comes from
+  `color: "palette"` + `flags.fullsize`, `background: "key"`: a square picture in the
+  game's style, cut into the launcher's standard hexagon by `scripts/icon_badge.py make`
+  (never a drawn hexagon: it comes out bigger or smaller than every other icon). The **packed** tier comes from
   the manifest's top-level `icon` object: the default (full colour, 160) is RAW565, so
   the corners render black on the dark launcher; transparent corners need
   `"icon": {"color": "palette", "side": 120}` (drawn ×2) or `240` (fullsize). Details:
@@ -158,6 +159,15 @@ only; the style-lock steps 1-6 below apply to every source (for the procedural s
    the same key. Never write `keys.json` by hand unless a raw really is on `#FF00FF` / `#00FF00`.
 - P5. Style lock: the leaders drawn by the script are the style frames; the mock as usual; then
    `art.py anchor M --only <leaders>` and `art.py style M`. Images cost no budget.
+- P0 (before P1-P5, when the user gave no style reference of their own): **two or three directions**.
+   The user is never asked about the look in words up front, so the style stop must offer a real choice,
+   not one finished look to approve (two real runs: the agent picked the style alone and showed only it,
+   and the tester's note was "it never asked me about the graphics style"). Draw the hero and one
+   playfield piece in 2-3 clearly different directions that all fit the GDD's Art Style (e.g. flat with
+   thick outlines / soft shaded with no outline / pixel art at the sprite's real size; or three palettes
+   with different moods), each as a small one-screen mock, into `assets_<game>/style/directions.png`
+   side by side, labelled A, B, C with a 3-6 word name each. Cheap: one function per direction in a
+   throw-away script under `.agent_scratch/`. The chosen one becomes STYLE.md and P1's script.
 
 **Style-lock steps 1-6** (every source):
 
@@ -182,7 +192,12 @@ only; the style-lock steps 1-6 below apply to every source (for the procedural s
 5. **Show the user, one short message**: the style frame(s), the mock, the one-line
    style summary from STYLE.md, and (recordings only) the sound list with licences and sizes. Ask which
    frame, what to change, and (recordings only) whether to download the sounds. Iterate until the style is
-   approved; corrections go into STYLE.md.
+   approved; corrections go into STYLE.md. With no reference from the user (P0, and `candidates --n 3`
+   for generated art), this is a **choice**, not a yes/no: one question with the directions as options
+   (A, B, C by their names, "something else: describe it") on `directions.png`; then draw the chosen
+   direction's leaders and mock and confirm them in the same stop ("This is direction B on the whole
+   face: lock it, or change something?"). The autonomous run's style stop is still one stop: the choice
+   and its confirmation are its two questions.
 6. **Lock it.** First re-read STYLE.md against the approved frame, rule by rule (outline,
    tone steps, light, palette roles, Do/Don't): where they disagree, rewrite STYLE.md and its
    Prompt block (and the manifest's `_style`, rerun `validate`) to describe the approved frame,
@@ -511,12 +526,12 @@ dispatch a new reviewer (fresh, not the same one) on the redrawn set. Minor-only
 findings: fix the cheap ones (a `fixes.json` line plus one redraw, a `process` option),
 record the rest in the context (`accepted_minors: [{"asset", "finding"}]`, named in the
 final report) and go on: no fresh review for minors. Fresh batch reviews per Stage 3:
-`lite` 2, `standard` 3, `full` 5 (a real run spent ~190k tokens on fresh reviews of
+`lite` 1, `standard` 3, `full` 5 (a real run spent ~190k tokens on fresh reviews of
 minor fixes). `art.py qa` hard failures are not reviewer findings: they always block the
 pack (§3).
 
 **When the fresh reviews are spent** and the last one still lists critical or major findings
-(a real `lite` run ended its second review with three majors open), they are never fixed and
+(a real run ended its last review with three majors open), they are never fixed and
 then left unchecked. One rule, in this order:
 
 1. Fix each open critical/major through the §3 loop as usual (a redraw, a `fixes.json` line, a
@@ -526,7 +541,7 @@ then left unchecked. One rule, in this order:
    asset concerned (`raw` and `art`), STYLE.md and the anchors, and answers per finding:
    `{"agent": "asset_recheck", "findings": [{"asset", "rule", "severity", "status": "resolved|open",
    "note"}]}`. It judges those findings only, not the whole set, so it costs a fraction of a fresh review.
-   One focused re-check per round of fixes, at most two rounds (`full`: three).
+   One focused re-check per round of fixes, at most two rounds (`lite`: one; `full`: three).
 3. A finding the re-check still calls open, or one with no fix left to try (the image budget is spent,
    or the rule cannot be met), is **waived on the record**: `accepted_majors: [{"asset", "finding",
    "reason": "review budget spent"}]` in the context (the one shape, `AGENT_BRIEFS.md` "Context file") (criticals are never waived: an unusable asset

@@ -72,6 +72,8 @@ APP_DIR="$WORKSPACE/$APP"
 if [ "$SKIP_BUILD" -eq 0 ] && [ "$GET_SIM" -eq 0 ] && ! sim_problem="$(sim_check)"; then
     fail "$sim_problem. Installing it puts software on the machine, so it waits for the user's approval; then run: bash $REPO_ROOT/tools/sim/get_sim.sh (or re-run new_app.sh with --get-sim). Nothing was created."
 fi
+# the pipeline Python on Linux/macOS is ~/.wowcube/venv (install.sh makes it): system Pythons lack the packages
+[ -x "$HOME/.wowcube/venv/bin/python3" ] && PATH="$HOME/.wowcube/venv/bin:$PATH"
 PY=python3; command -v python3 >/dev/null 2>&1 || PY=python
 
 # --- 0. toolchain report -----------------------------------------------------------

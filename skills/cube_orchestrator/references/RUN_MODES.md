@@ -156,15 +156,24 @@ checks: an older project file with `verification: lite` gets the checks below wi
 | Max fix rounds per prompt | 2 | 3 | 5 |
 | Rescopes per run (autonomous) | 2 | 3 | 5 |
 | Default image budget (Stage 3) | 30 | 80 | 200 |
-| Fresh art reviews (Stage 3), then focused re-checks of the fixes | 2, then 2 | 3, then 2 | 5, then 3 (still open after them: waived on the record and reported, STAGE3_ASSETS.md §10) |
+| Fresh art reviews (Stage 3), then focused re-checks of the fixes | 1, then 1 | 3, then 2 | 5, then 3 (still open after them: waived on the record and reported, STAGE3_ASSETS.md §10) |
 | Who gets it | autonomous guidance (*On my own*, *Just show me results*, the default) | only on the user's explicit words | guided (*Step by step*), or "check everything thoroughly" |
 
 **The quick lane (`lite`).** One or two prompts, and every prompt gets the full set of checks: the plugin
 build with the ARM `-Werror` device check, a hidden run with the 24-screen review (frames looked at, then
 deleted), the Requirements Agent and the Template Agent as two separate reviewers, and the Playtest Agent;
 at most 2 fix rounds; then the device `.oct` and `pack_beta.py --verify-oct` as always. What makes it
-quick is the structure (few prompts, few fix rounds, a small image budget), never fewer checks. Every
-autonomous run gets this lane unless the profile or the request says otherwise.
+quick is the structure (few prompts, few fix rounds, a small image budget, one fresh art review), never
+fewer code checks. Every autonomous run gets this lane unless the profile or the request says otherwise.
+
+**Usage limits.** A real `lite` run (2 prompts, art in code) used up a whole 5-hour usage window of the
+user's Claude plan before its last checks, so a game can take more than one window. Say so once, in the
+start line ("a game can take more than one usage window of your Claude plan; if the limit runs out,
+everything is saved: say \"continue\" when it resets"), never the plan's name. Spend where it finds
+bugs: one fresh art review; a re-check reads only the diff (never a full review unless `cube_verifier`
+asks); one gate run per coder or fixer run (a second only for a finding the first could not settle);
+the playtest instance stopped by PID the moment its agent returns (`VISUAL_GATE.md`, playtest step 5, on
+every OS); no waiting loops that re-read files while a subagent works (its result arrives by itself).
 
 **The playtest rule (`standard`; `lite` and `full` playtest every prompt), one sentence:** a prompt gets the Playtest Agent when its category is listed for
 the tier **or** it adds or changes an input (a tap, twist, tilt or shake the game reacts to) or a
@@ -191,14 +200,14 @@ and say it is an estimate. Tokens are the **total** (subagents and the main sess
 
 | Estimate for | Time | Tokens |
 |---|---|---|
-| `lite`, a 1-prompt simple game | estimate: about 45–75 min (old lite with one reviewer and lighter art reviews: ~17 min measured, release 2.4.0; now two reviewers, a playtest and two fresh art reviews) | estimate: about 1M in total (old lite: ~0.6M subagents) |
+| `lite`, a 1-prompt simple game | estimate: about 45–75 min (old lite with one reviewer and lighter art reviews: ~17 min measured, release 2.4.0; now two reviewers, a playtest and one fresh art review) | estimate: about 1M in total (old lite: ~0.6M subagents) |
 | `lite`, a new small game (2 prompts, art in code) | estimate: about 1.5–2.5 h (old lite, one reviewer and a playtest only on the last prompt: ~1 h 40 min measured in a QA run) | estimate: about 1.5–2M in total (old lite: ~1.2M subagents measured) |
 | `standard`, a studio game, 8 prompts | ~2 h 15 min | ~3.5M (subagents) |
 | `full`, one foundation prompt with one fix round | measured: ~1.5 h | ~2M (subagents) |
 | a light-lane tunable change | a few minutes; about 10–15 min with its playtest | well under 0.1M; about 0.2M with its playtest |
 
 The formula (it reproduces the rows):
-- `lite`: the first prompt, with setup, the art drawn in code, its two fresh art reviews and delivery,
+- `lite`: the first prompt, with setup, the art drawn in code, its fresh art review and delivery,
   about 45–75 min and about 1M tokens; each further prompt about 45–75 min and about 0.5–1M tokens (two
   reviewers, a playtest, up to two fix rounds). 2 prompts: about 1.5–2.5 h, about 1.5–2M. Not measured
   yet for the current `lite`.
@@ -209,7 +218,7 @@ The formula (it reproduces the rows):
   tier's fresh art reviews. Codex art adds about 1-3 min per picture on top (2-4 min each instead of
   about one; pictures = the manifest's sprites plus redraws, capped by the image budget). The fresh art
   reviews are already in the rows; measured: three fresh reviews of 9 sprites took ~42 min and ~580k
-  tokens (STAGE3_ASSETS.md §3), so about 12–15 min and ~0.2M per review: `lite` (2) about 25–30 min,
+  tokens (STAGE3_ASSETS.md §3), so about 12–15 min and ~0.2M per review: `lite` (1) about 12–15 min,
   `standard` (3) about 40–45 min, `full` (5) about 60–75 min, more for a large set.
 - *Art only* (`entry: art`) is just the art part: the pictures and the tier's reviews, no code.
 
@@ -240,7 +249,7 @@ the first change to a game brought in from outside pays for the import (M0) once
 |---|---|---|
 | First change to an imported game, `lite`: M0 import incl. art extraction (a game delivered without art sources), one sprite change, its gates, the repack and the device `.oct` | estimate: about 1–1.5 h (old lite with one reviewer measured ~1 h; now two reviewers and a playtest) | estimate: about 1.2M subagents |
 | One small feature on a fork, `standard`: three code-drawn sprites, one fresh art review, no fix round | measured 2026-11-03: ~25 min, ~0.85M tokens (~0.6M subagent + ~0.25M main session; Claude only, art drawn in code) | see Time |
-| The same small feature, `lite` | estimate: about 35–50 min (adds a playtest and a second fresh art review) | estimate: about 1–1.2M in total |
+| The same small feature, `lite` | estimate: about 35–50 min (adds a playtest) | estimate: about 1–1.2M in total |
 | Each further change in the same run | less: the import, the baseline frames and the extraction are done once | |
 
 `full` mods are not measured: estimate them like one `full` prompt. A tunable change (speed, timing, a

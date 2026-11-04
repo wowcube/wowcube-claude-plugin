@@ -10,6 +10,7 @@ numpy==2.4.4
 
 # PSD file writing (used by build_psd.py)
 pytoshop==1.2.1
+six==1.17.0          # pytoshop imports it but does not declare it
 
 # PSD file reading (used by pack.py)
 psd-tools==1.9.34

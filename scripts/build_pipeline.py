@@ -344,6 +344,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_ICON = REPO_ROOT / "templates" / "app_ai_template" / "art" / "icon.png"
 
 
+def _warn_icon_shape(icon: Path) -> None:
+    """A WARNING when the launcher icon is not in the launcher's standard hexagon (scripts/icon_badge.py)."""
+    if not icon.is_file():
+        return
+    try:
+        from PIL import Image
+        import icon_badge
+        problems = icon_badge.check(Image.open(icon))
+    except Exception:          # a check that cannot run never blocks a pack
+        return
+    for p in problems:
+        print(f"WARNING: launcher icon {icon}: {p}", file=sys.stderr)
+
+
 def _sync_fonts(app_dir: Path, workspace: Path) -> tuple[int, int, list[str]]:
     """BMFont glyphs are packed only when font_*.fnt + their atlas PNGs sit in
     <workspace>/fonts. A scaffolded app keeps them in app_<game>/art, so
@@ -727,8 +741,10 @@ def do_pack(args: argparse.Namespace) -> int:
         if not args.icon:
             icon = app_dir / "art" / "icon.png"
             if icon.is_file() and TEMPLATE_ICON.is_file() and icon.read_bytes() == TEMPLATE_ICON.read_bytes():
-                print("WARNING: app_<game>/art/icon.png is still the TEMPLATE icon - generate the game's "
-                      "launcher icon (160x160 RGBA flat-top hexagon badge) and pass --icon", file=sys.stderr)
+                print("WARNING: app_<game>/art/icon.png is still the TEMPLATE icon - make the game's "
+                      "launcher icon (scripts/icon_badge.py make <picture> --out app_<game>/art/icon.png) and "
+                      "pass --icon", file=sys.stderr)
+        _warn_icon_shape(Path(args.icon) if args.icon else app_dir / "art" / "icon.png")
         # the beta simulator loads sounds ONLY from <app_dir>/sound/assets/;
         # the generate stage encodes its beta mp3s into <workspace>/wav/assets/
         # (it doesn't know the app dir), so carry them over BEFORE pack.py

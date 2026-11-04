@@ -37,8 +37,9 @@ curl -fsSL https://raw.githubusercontent.com/wowcube/wowcube-create/main/install
 irm https://raw.githubusercontent.com/wowcube/wowcube-create/main/install.ps1 | iex
 ```
 
-Then **restart Claude Code** (if it was open), start a new session in a folder for your games and say **"I want
-to make a game for my WowCube"**. The install asks no questions: running the command is your yes to installing
+Then **restart Claude Code** (if it was open), start a new session in a short folder for your games (for
+example `C:\games` or `~/games`; in the Claude desktop app pick that folder for the session, not "no folder") and
+say **"I want to make a game for my WowCube"**. The install asks no questions: running the command is your yes to installing
 what a game build needs.
 
 Or in Claude Code, two commands:
@@ -65,7 +66,8 @@ Or just ask Claude, in two steps:
 
 1. **Install** (above): one command in a terminal, or ask Claude to "install the WowCube plugin … and set up
    everything it needs". Nothing is asked during the install.
-2. **Restart Claude Code**, open a new session in an empty folder for your games (your workspace) and say
+2. **Restart Claude Code**, open a new session in a short, empty folder for your games (your workspace, for
+   example `C:\games` or `~/games`: long paths break the Windows build tools) and say
    **"I want to make a game for my WowCube"**, or describe it right away: **"Make a cube game: a fox catches
    fireflies by tilting the cube."**
 3. The first time, it asks at most three short questions: what you start from, how you want to work

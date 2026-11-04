@@ -17,7 +17,8 @@ same numbers live in `scripts/art_sizes.py` (code) and the engine facts in
 - **Fullsize** sprites are drawn 1:1, up to 240x240, and always sit **above** every half-size sprite and
   the text on that screen. Use them only for special cases (a crisp splash, a detailed full-screen
   picture with nothing drawn over it).
-- The **launcher icon** is its own thing: 160x160, a flat-top hexagon badge.
+- The **launcher icon** is its own thing: a 160x160 square picture, cut into the launcher's standard hexagon by
+  `scripts/icon_badge.py make` (never a drawn hexagon).
 
 ## Typical drawn sizes by role
 

@@ -27,7 +27,7 @@ ROLES = {
     "button": ((20, 80), "a button or panel: 20-80 px drawn wide (40-160 px on screen; a finger needs 60+ px on screen)"),
     "hud_icon": ((8, 32), "a small HUD icon (heart, coin, star): 8-32 px drawn"),
     "particle": ((2, 16), "a particle or spark: 2-16 px drawn"),
-    "launcher_icon": ((160, 160), "the launcher icon: 160x160, a flat-top hexagon badge"),
+    "launcher_icon": ((160, 160), "the launcher icon: a 160x160 square picture (icon_badge.py cuts the hexagon)"),
     "sprite": ((4, 120), "any other sprite: at most 120 px drawn per side"),
 }
 
