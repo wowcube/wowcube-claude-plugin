@@ -4,17 +4,17 @@
 #   tools/sim/get_sim.sh
 #
 # 1. The plugin carries the prebuilt simulator: simulator/dist/<version>/<linux|macos-arm64|macos-x86_64>/
-#    wowcube-sim-<os>.tar.gz (wowcube-sim + its SDL3 library [+ spptest on Linux]; macOS by uname -m: Apple Silicon or
-#    Intel), described by simulator/dist/<version>/manifest.txt (tools/sim/stage_dist.py, from the CI build of the
-#    private simulator sources). <version> is the one this plugin needs (sim_version in api/SOURCE: the public game API
-#    and the simulator come from one commit of the sources). No git, no network, no compiler.
+#    wowcube-sim-<os>.tar.gz (wowcube-sim and its libraries; macOS by uname -m: Apple Silicon or Intel), described by
+#    simulator/dist/<version>/manifest.txt (the release build of the simulator). <version> is the one this plugin
+#    needs (sim_version in api/SOURCE: the public game API and the simulator match one engine version). No git, no
+#    network, no compiler.
 # 2. The archive's sha256 must match the manifest; it is unpacked into a staging folder and "wowcube-sim --version"
-#    (30 s limit) must name that version and the manifest's build commit. Only then the files replace
+#    (30 s limit) must name that version and the manifest's build id. Only then the files replace
 #    <sim dir>: ~/.wowcube/sim/<version>/<os>/ (or $WOWCUBE_SIM_DIR), outside the plugin folder (tools/sim/sim_path.sh).
 # 3. There is no other way to get it: the plugin ships no simulator sources, so a missing or damaged prebuilt simulator
 #    is an incomplete plugin (reinstall or update it). --no-build is accepted and ignored (old command lines).
 # Linux: built on Ubuntu 22.04 (glibc 2.35 or newer); it still needs the system's OpenGL/EGL, X11 or Wayland
-# libraries, BlueZ (libbluetooth3) and libsystemd.
+# libraries and the system libraries scripts/check_env.sh lists.
 # Exit 0 = the simulator is in place and is the version this plugin needs; 1 = failed.
 set -uo pipefail
 

@@ -75,7 +75,7 @@ which sections were used. A rule broken on purpose is listed there too, with the
 - **No "stand still and win"**: if the player can win without moving, the balance is
   wrong. A working starting set: regular opponents fall in 2 hits, a fire cooldown of
   about 1 s, a heavy opponent (5 hits, changes look after 2) that forces movement, a cap
-  on opponents per screen (3 was right for a 4x4 grid on one face).
+  on opponents per screen (about 3 when the playfield is one face).
 - A charge or dash from a distance is fun when it is frequent enough to matter: tune its
   frequency; show its path during the wind-up.
 

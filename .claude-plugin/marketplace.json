@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "WowCube game pipeline for Claude Code: from an idea or a design document to a tested game on your cube.",
-    "version": "2.8.0"
+    "version": "2.9.0"
   },
   "plugins": [
     {

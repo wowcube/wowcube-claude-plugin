@@ -30,7 +30,7 @@ extern "C"
 
 
 //Exports table - set at compile time with module's callback addresses. The simulators bind the same exports
-//from sim/src/sim_app_bind.h; a new optional export goes into both lists.
+//from the simulator's app binder; a new optional export goes into both lists.
 extern "C" 
 {
 

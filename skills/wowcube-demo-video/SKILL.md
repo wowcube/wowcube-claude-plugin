@@ -1,12 +1,12 @@
 ---
 name: "wowcube-demo-video"
-description: "Making WowCube game demo videos in the standard format: 1920 x 1080, the 3D cube on the left, the same 24 screens as a 2D net plus the controls legend on the right, captions per scene, the game played by a bot or autopilot on the real rules. Three methods: recording an existing HTML prototype (the external path), capturing sprites from the game and rendering screens with the engine (both need the internal SDK). Use for every video request, including a video of a prototype: \"make a video\", \"record a demo\", \"gameplay video\", \"record a clip\", \"demo for the game designer\". Building the prototype page itself is wowcube-html-prototype."
+description: "Making WowCube game demo videos in the standard format: 1920 x 1080, the 3D cube on the left, the same 24 screens as a 2D net plus the controls legend on the right, captions per scene, the game played by its autopilot on the real rules, recorded from the game's HTML prototype. Use for every video request, including a video of a prototype: \"make a video\", \"record a demo\", \"gameplay video\", \"record a clip\", \"demo for the game designer\". Building the prototype page itself is wowcube-html-prototype."
 ---
 
 # WowCube game demo video
 
-Everything needed is in this skill (scripts, templates and examples), except the HTML recorder of
-method A, whose one copy lives in the sibling skill `wowcube-html-prototype`.
+Everything needed is in this skill, except the HTML recorder of method A, whose one copy lives in the
+sibling skill `wowcube-html-prototype`.
 
 `<skills>` = the folder two levels above this SKILL.md (the plugin root; `${CLAUDE_PLUGIN_ROOT}` when the host exports it); resolve it on every entry, never store it. This skill's folder is
 `<skills>/skills/wowcube-demo-video/`.
@@ -14,38 +14,32 @@ method A, whose one copy lives in the sibling skill `wowcube-html-prototype`.
 ```
 ../wowcube-html-prototype/scripts/record_html.mjs
                              records an HTML prototype on a fake clock (method A)
-scripts/render_demo.py       video from a game capture: 3D cube, net, legend, twist rotations (B, C)
-templates/capture.h          capture harness: frames.jsonl, frame by frame (B, C)
-templates/shot.h             renders all 24 screens with the real engine into a PNG net (C)
-templates/capture_demo.sh    builds and runs the capture with host g++ against the engine (folder next to the game)
-templates/demo.json          clip styling: title, subtitle, legend, font, paths
-examples/template_tour/      method B example for the plugin's template app: capture.cpp (scenario), bot.h (bot), demo.json
-examples/template_twists/    method C example for the template app: capture.cpp (scenario with twists), demo.json
-references/layout-*.jpg      what a frame looks like
+references/layout-html.jpg   what a frame looks like
 ```
 
 ## Where things go
 
-- The video goes to `docs/demo/<game>_demo.mp4` in the game repository, together with intermediates
-  (`frames.jsonl`, `sprites/`, `net/`). `docs/demo/` and `*.mp4` are in `.gitignore`.
-- Stills from the finished video are illustrations for documents: the GDD cover (Intro section), scene
-  frames in the game description. They go to `docs/img/<game>_<scene>.jpg` and are committed:
-  `ffmpeg -ss <sec> -i docs/demo/<game>_demo.mp4 -frames:v 1 -vf scale=1280:-1 -q:v 3 docs/img/<game>_<scene>.jpg`.
+- **A game in the WowCube pipeline**: the video goes to `<ws>/video/<game>_demo.mp4` in the workspace
+  (create `<ws>/video/` first: the recorder does not create folders). Stills from it go to
+  `<ws>/video/<game>_<scene>.jpg`:
+  `ffmpeg -ss <sec> -i <ws>/video/<game>_demo.mp4 -frames:v 1 -vf scale=1280:-1 -q:v 3 <ws>/video/<game>_<scene>.jpg`.
+  They can illustrate the GDD (its Intro section) and the game description.
+- **An existing game repository** (no pipeline run): `docs/demo/<game>_demo.mp4` (`docs/demo/` and `*.mp4` in
+  `.gitignore`); stills for documents go to `docs/img/<game>_<scene>.jpg` and are committed.
 
 ## What it looks like
 
-Frame: `references/layout-engine-capture.jpg` (game capture) and `references/layout-html.jpg`
-(HTML prototype). The same for every game:
+Frame: `references/layout-html.jpg` (HTML prototype). The same for every game:
 
 - 1920 x 1080, dark background, two rounded panels.
-- **Left**: a small-caps header with the game's gestures (`3D · TILT MOVES THE PLAYER · PAT · TWIST`); a
+- **Left**: a small-caps header with the game's gestures (`3D · TILT MOVES THE PLAYER · TAP · TWIST`); a
   large 3D cube, slightly tilted following gravity, twists rotate half of the cube; a caption plate at the
   bottom: a bold line and a short explanation.
 - **Right**: `NET (2D) · SAME SCREENS, UNFOLDED`, a cross-shaped net (U on top, L F R B, D at the bottom)
   with face letters; the game title in two colours, subtitle `WowCube game · <tagline>`; a legend
   "icon + gesture + what it does", with the current gesture's row highlighted.
-- Gesture icons are the game's own sprites (its twist, pat, tilt icons); the font is the game's font.
-- 35-90 s; 20 fps for an engine game (frame = tick), 30 fps for HTML. `libx264`, `yuv420p`, crf 18-20.
+- Gesture icons are the game's own sprites (its twist, tap, tilt icons); the font is the game's font.
+- 35-90 s; 30 fps for HTML (20 fps for an engine capture: frame = tick). `libx264`, `yuv420p`, crf 18-20.
 
 ## Scenario
 
@@ -54,7 +48,7 @@ Each scene is one idea with one caption (`capShot` / autopilot step):
 1. Title, 2-3 s.
 2. The first level with tutorial hints.
 3. Each mechanic once: the caption names the gesture and the result.
-4. A mistake and its fix (an extra twist → restart with a double pat, losing a life).
+4. A mistake and its fix (an extra twist → restart with a double tap, losing a life).
 5. A late level that uses the whole cube.
 6. Victory, results, selector, game over or the ending.
 
@@ -72,70 +66,15 @@ Playwright is never installed into the plugin folder: install it once under
 The recorder looks for it in `$WOWCUBE_NODE_DIR`, `~/.wowcube/node`, the workspace, then its own folder.
 
 ```bash
-node <skills>/skills/wowcube-html-prototype/scripts/record_html.mjs <dir>/<game>_prototype.html docs/demo/<game>_demo.mp4 \
+node <skills>/skills/wowcube-html-prototype/scripts/record_html.mjs <dir>/<game>_prototype.html <ws>/video/<game>_demo.mp4 \
      --seconds 120 --stopWhen "window.__demoDone"
 ```
 
 `<dir>` is where the prototype lives: `plans/` for a pipeline game, `docs/` in a game repository (see
-`wowcube-html-prototype`, "Where to put it").
+`wowcube-html-prototype`, "Where to put it"); in a game repository the output is `docs/demo/<game>_demo.mp4`.
 
 Frame = exactly 1/30 s on Playwright's fake clock: the video is smooth and identical on every run.
 Page errors are printed, exit code 2.
-
-## Methods B and C: engine game (needs the internal SDK)
-
-**External users: use method A.** B and C compile the game on the host against the SDK's host test shim
-(`oct_test_shim.h`, in the engine's `tests/` folder of a WowCube developer's SDK checkout). That header is
-not part of this kit: the plugin ships only the public game API (`<skills>/api/`), no engine sources, so
-`capture_demo.sh` stops with "needs the internal SDK" without one. The rest of this section is for WowCube
-developers.
-
-Common ground: the game runs headless on the host with the real rules and rendering; the scenario is
-the game's file `tests/capture.cpp`; `capture.h` writes every frame as a JSON line to
-`docs/demo/frames.jsonl`; `render_demo.py` assembles the video. Work directly in the game folder on the
-developer's machine (g++, uv, ffmpeg and the engine are there).
-
-1. Copy into the game: `templates/capture.h` → `tests/`, `templates/capture_demo.sh` → `scripts/`,
-   `templates/demo.json` → `docs/demo/demo.json` (fill it in); for C also `templates/shot.h` → `tests/`.
-2. Write `tests/capture.cpp` following an example (`examples/template_tour` or `examples/template_twists`, both written for
-   `<skills>/templates/app_ai_template`):
-   - includes, in the examples' order: the SDK's host test shim header (in the engine's `tests/` folder, which
-     `capture_demo.sh` puts on the include path), `oct.h`, **`capture.h` before `app.h`**, `app.h`, (`shot.h`
-     after `app.h`);
-   - `tick()` = bot input → `on_tick()` → `capFrame()`;
-   - `capShot(caption, sub, legendRow, yaw, pitch, yawSpeed)` before each scene;
-   - twist: `on_pretwisted(plane)` (the plane, `(t % OCT_TWIST_HALF) / 2`, not the twist id) → `OCT_twist_sprites(t)` → `on_twisted(t, 0)` → `capTwist(t)`;
-   - the bot (`bot.h`), as in the `template_tour` example, moves gravity `Gf`; taps and twists arrive through
-     the game's own callbacks (`on_tap`, `on_twisted`) as the engine delivers them, never touching the rules; if needed, reuse the same bot as in the host tests.
-3. Capture: `scripts/capture_demo.sh` (B) or `CAPTURE_NET=1 scripts/capture_demo.sh` (C).
-4. Video:
-
-```bash
-uv run --python 3.12 --with numpy==2.4.4 --with pillow==12.2.0 <skill>/scripts/render_demo.py docs/demo/demo.json
-# quick preview: --every 4; single frame: --still <frame>
-```
-
-The numpy / Pillow pins are the ones in `<skills>/scripts/requirements.txt`; keep them in step.
-
-**B: sprites** (regular sprite games): `capture.h` writes all live sprites of the frame;
-`render_demo.py` draws them from the sprite dump in `docs/demo/sprites/` (one PNG per sprite, named as in the
-ids header, at its on-screen size with its pivot in the centre) and the game's font. For a pipeline game it
-makes the dump itself: `render_demo.py docs/demo/demo.json --dump assets_<game>/art --manifest
-plans/<game>_assets.json` (x2 like the engine, fullsize sprites 1:1, pivots from the manifest); any other game
-exports such PNGs from its own art. Label texts must be passed through a hook: in the game's source file that
-creates its labels, next to the label call, `RENDER_LABEL_HOOK(id, text, font, color, align);` with a default
-`#define RENDER_LABEL_HOOK(...) ((void)0)` under `#ifndef` (`capture.h` must be included before that file). In `demo.json`: `ids` (pack header), `sprites`, `labelFonts` (font number → size, style).
-
-**C: engine rendering** (games with `on_proc_draw`, or when pixel-exact engine output is needed): `shot.h`
-loads the pack like the simulator does (`index.bin`, `art/packed`, `sound/assets`: pack the game first, e.g.
-`python <skills>/scripts/build_pipeline.py pack ... --app-dir app_<game>` or `scripts/repack_app.py --app-dir
-app_<game> --skip-device`) and on every frame renders all 24
-screens to `docs/demo/net/NNNNN.png`. Legend icons are PNG paths.
-
-**Twists** in B and C: the renderer precedes the frame after `capTwist` with a rotation of half the cube
-(8 frames, `--twist-frames`). Which half and which direction is found by comparing screens before and
-after; the engine's twist table is not needed. If the screens are fully redrawn after a twist (the twist
-is a command, not a rotation), no rotation is shown, which is expected.
 
 ## Verification
 

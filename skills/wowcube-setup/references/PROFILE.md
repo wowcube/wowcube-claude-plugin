@@ -32,6 +32,12 @@ brief carries it (`profile` in the brief JSON, `cube_orchestrator/references/AGE
 }
 ```
 
+`install_consent` has one shape, `{"answer": "yes"|"not_now", "date": "YYYY-MM-DD"}`, written by the
+one-command installers (`install.sh`, `install.ps1`: running them is the yes), the environment-only install
+and setup's Step 2b, always merged into the file (other keys kept). Readers use
+`profile_provider.install_consent`, which also accepts an older plain string (`"yes"`, `"not_now"`). `yes`
+means no install question again: setup only installs what is still missing, under that consent.
+
 `art.codex` and `art.keys_found` are detection facts, never a choice: `image_provider` is written only
 from what the user picked (never from a detected login or key; `none` until they pick one). An older file's
 `cube` (a paired cube) is ignored: nothing goes to a cube from this computer.
@@ -54,7 +60,7 @@ from what the user picked (never from a detected login or key; `none` until they
   "art": {"source": "codex|own|procedural|provider|placeholder|original", "provider": "openai|null",
           "new": "procedural|codex", "animation": "frames|video", "animation_provider": "higgsfield|null"},
   "sound": {"source": "synth|cc0"},
-  "data_policy": {"may_leave_machine": ["prompts", "design_text", "reference_images"]}
+  "data_policy": {"may_leave_machine": ["prompts", "reference_images"]}
 }
 ```
 
@@ -67,8 +73,8 @@ from what the user picked (never from a detected login or key; `none` until they
   `entry` is `gdd`): every scope or mechanic change waits for the user's yes.
 - `source.rights` (entry `mod`): the user's plain answer to "Do you have the right to change this game and
   publish your version?". `yes` → mod it; `no` → it is not modded (the owner's permission is needed);
-  `unsure` → the mod is made for private testing only (simulator, the user's own cube), never published or
-  shared, and the report says so. Asked whenever the game was not made by this user in this workspace.
+  `unsure` → the mod is made for private testing only (the automatic checks and the user's own cube),
+  never published or shared, and the report says so. Asked whenever the game was not made by this user in this workspace.
 - `art.source: original` (mods): keep the game's own art, extracted from its pack
   (`scripts/extract_art.py`; the context's `style_lock.status` is `user_art`); `art.new` says how changed or
   new pictures are made: `procedural` (default, in code on this machine) or `codex` (only when the user has
@@ -80,8 +86,9 @@ from what the user picked (never from a detected login or key; `none` until they
   `video` for an image-to-video service such as Higgsfield;
   `scripts/profile_provider.py` `RESOURCE_IDS`), `note` their words. It is the source of truth for the art
   routes (`profile_provider.art_routes`): a tool that detection found but the user did not name is never
-  used; it is at most mentioned once. Drawn in code (`procedural`) and the user's own art are always
-  possible. Nothing in a profile names a subscription plan.
+  used; it is at most mentioned once. Drawn in code (`procedural`) is always possible; the user's own art
+  (`own`) when they named it (`own_art`: an artist, their own pictures), and a mod's kept art (`original`)
+  on entry `mod`. Nothing in a profile names a subscription plan.
 - `art.animation`: how animation frame sets are made. `frames` (the default, also when absent): every
   frame is drawn by the picture route. `video`: looping idles, walk/run cycles and short actions are
   animated by the image-to-video service in `art.animation_provider` (e.g. `higgsfield`) from one approved
@@ -92,14 +99,18 @@ from what the user picked (never from a detected login or key; `none` until they
   frames are drawn, said once) and the user's yes to the quoted credits once per run; a connector found in
   the session is never the answer, and the consent is never stored. It adds `animation_frames` to
   `data_policy.may_leave_machine` (the base picture and the motion description go to the service);
-  `may_leave_machine: []` rules it out.
+  `may_leave_machine: []` rules it out. The service animates; it does not draw the pictures: its own image
+  models draw a base picture only when the user also named it as their picture tool, and its GPT image
+  model never when the user has ChatGPT (`cube_art-director/references/ANIMATION_VIDEO.md`, "The base
+  picture").
 - `verification` follows the guidance answer; there is no question about it
   (`profile_provider.verification_for_guidance`): `autonomous` (*On my own*, *Just show me results*, the
   defaults) = `lite`, `guided` (both *Step by step* answers) = `full`. `lite` is the quick structure (one or
   two prompts, 2 fix rounds) with the full set of checks on every prompt: two separate code reviewers, the
   24-screen review and the playtest. `standard` is never offered; it is written only when the user asks
-  for it in their own words ("check it more but not every detail"), and "check everything thoroughly"
-  writes `full` (`profile_provider.verification_for`). No answer makes the checks lighter than `lite`. The
+  for it in their own words (an explicit "standard", or "check it more but not every detail"); "check
+  everything thoroughly" writes `full`, "quick" or "fast" `lite`; any other word ("normal") changes nothing
+  (`profile_provider.verification_for`). No answer makes the checks lighter than `lite`. The
   tier sets the reviewers, playtests, fix rounds, rescopes, the image budget and the art review rounds
   (RUN_MODES.md, "Verification tiers"). A project file without `verification` resolves it from
   `guidance` the same way.
@@ -119,8 +130,11 @@ from what the user picked (never from a detected login or key; `none` until they
 - `sound.source: synth` (the default) = synthesized by `sound_kit.py` recipes, final; `cc0` = CC0
   recordings from an approved list, only when the user asked for real recordings (synthesis only fills
   gaps, temporary).
-- `data_policy.may_leave_machine: []` rules out Codex and every cloud provider; the pipeline then uses
-  the user's own art or the procedural style, and never sends the design text anywhere.
+- `data_policy.may_leave_machine` lists what may leave the machine (`profile_provider.data_policy_for`):
+  Codex or a cloud provider `["prompts", "reference_images"]`, plus `animation_frames` with
+  `art.animation: video`; a local model, the user's own art, drawn-in-code art and a mod's kept art `[]`.
+  The design text is never sent anywhere, so it is never listed. `[]` rules out Codex and every cloud
+  provider; the pipeline then uses the user's own art or the procedural style.
 - Paid consent is **never** stored: it is asked per run (RUN_MODES.md).
 - The plugin folder `<skills>` is **never** stored either: a plugin update or a move would leave a stale
   path. Every entry skill resolves it from its own location (two levels above its SKILL.md) on every entry.
@@ -184,7 +198,7 @@ file's fields, with every gap resolved, the tier's limits filled into `budget`, 
  "experience": "cpp", "verification": "lite", "resources": {"have": ["claude", "codex"]},
  "budget": {"hours": null, "images": 30, "fix_rounds": 2, "rescopes": 2, "scope_cuts": "ask"},
  "art": {"source": "codex", "provider": null, "animation": "frames"}, "sound": {"source": "cc0"},
- "data_policy": {"may_leave_machine": ["prompts"]}}
+ "data_policy": {"may_leave_machine": ["prompts", "reference_images"]}}
 ```
 
 ## Image provider
@@ -222,7 +236,7 @@ leaves the rest untouched; a lower number is upgraded in place by `wowcube-setup
 | Starting point | *A new game* / *My design document* / *An existing game* / *Art only* | `entry`: `new` / `gdd` / `mod` or `tools` (follow-up "What should I do with it?") / `art` |
 | Guidance | *On my own* (default) / *Step by step* / *Step by step, I know C++* / *Just show me results* | `guidance` + `experience` + `budget.scope_cuts` (setup SKILL.md, Step 2) + `verification`: `lite` for *On my own* / *Just show me results*, `full` for both *Step by step* answers |
 | AI tools and subscriptions | multi-select + free text | `resources.have` / `resources.note`; then `art.source` (follow-up only when more than one route), `art.provider`, `art.animation` / `art.animation_provider` (an image-to-video service named in the free text), `data_policy` (`profile_provider.data_policy_for`) |
-| Free text in any answer (no question of its own) | "check everything thoroughly" / "check it more but not every detail" / hours / a maximum of pictures / "cut without asking" | `verification` `full` / `standard`; `budget.hours`, `budget.images`, `budget.scope_cuts` |
-| Install the build components (not on *Art only*) | *Install them* / *Not now* | `~/.wowcube/config.json` `install_consent`; *Not now* stops every build until the user agrees |
+| Free text in any answer (no question of its own) | "check everything thoroughly" / "standard" or "check it more but not every detail" / "quick" or "fast" / hours / a maximum of pictures / "cut without asking" | `verification` `full` / `standard` / `lite` (any other word: nothing); `budget.hours`, `budget.images`, `budget.scope_cuts` |
+| Install the build components (not on *Art only*; not asked when `install_consent` is already `yes`) | *Install them* / *Not now* | `~/.wowcube/config.json` `install_consent` (`{"answer", "date"}`); *Not now* stops every build until the user agrees |
 
 An older project file may still carry `budget.usage` (`lean|normal|unlimited`): it is ignored.

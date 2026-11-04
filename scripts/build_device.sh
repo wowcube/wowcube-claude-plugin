@@ -6,7 +6,7 @@
 #     api/include (the declarations a game compiles against, api/README.md) into <app>/out, then
 #     scripts/pack_beta.py --build-oct (stamps SaveSize from APP_SAVE_SIZE reached through src/app_metadata.h,
 #     read from app_save.h's static_assert)
-#   octpack (only with --octavios <octavios dev checkout>; octpacker is not part of this plugin):
+#   octpack (only with --octavios <OctaviOS SDK checkout>; octpacker is not part of this plugin):
 #     uv run --frozen --project <octavios>/octpacker octpack-build <app> --out <out> --engine <octavios>
 #     (metadata from src/app_metadata.h, art/octpack.json packed if present, ARM build, the .oct)
 #   verify (mandatory): the .oct ends with out/<app>.bin, then scripts/pack_beta.py --verify-oct: magic, size, CRC,
@@ -74,7 +74,7 @@ octpack_ready=0
 [ -f "$OCTPACK/pyproject.toml" ] && [ "$use_uv" -eq 1 ] && [ -f "$APP_DIR/src/app_metadata.h" ] && octpack_ready=1
 case "$BUILDER" in
     auto)    [ "$octpack_ready" -eq 1 ] && BUILDER=octpack || BUILDER=python;;
-    octpack) [ "$octpack_ready" -eq 1 ] || fail "octpack-build needs --octavios <octavios dev checkout> (octpacker/), uv and src/app_metadata.h; the default --builder python needs none of them";;
+    octpack) [ "$octpack_ready" -eq 1 ] || fail "octpack-build needs --octavios <OctaviOS SDK checkout> (octpacker/), uv and src/app_metadata.h; the default --builder python needs none of them";;
     python)  ;;
     *) fail "--builder must be auto, octpack or python";;
 esac

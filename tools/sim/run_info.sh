@@ -10,7 +10,11 @@
 #   ri_write <path>            writes the file atomically (temp + mv) from the RI_* variables:
 #       RI_PID RI_EXE RI_START RI_OUT RI_WORK RI_LOG RI_MCP_PORT RI_SECONDS RI_EVERY_MS RI_ENDS_AT RI_RUN_ID
 #       [RI_EXIT RI_ENDED]     (an empty RI_MCP_PORT / RI_ENDS_AT is null; an empty RI_EXIT leaves exit out)
-#       [RI_KEEPALIVE RI_KEEPALIVE_LOG]  keepalive: 1 = true, else false; its log (empty = null)
+#       [RI_KEEPALIVE RI_KEEPALIVE_LOG]  keepalive: 1 or true = true; starting / failing / failed = that string
+#                              (keepalive.py moves "starting" to true after its first complete pulse); else false;
+#                              its log (empty = null)
+#   ri_keepalive_read <path>   the "keepalive" value run_info.json holds now (true, false, starting, failing, failed),
+#                              so a rewrite keeps what keepalive.py set
 
 ri_iso_utc() {
     if [ $# -eq 0 ]; then date -u +%Y-%m-%dT%H:%M:%SZ; return; fi
@@ -44,6 +48,11 @@ ri_json_opt_str() {
     if [ -n "$1" ]; then ri_json_str "$1"; else printf 'null'; fi
 }
 
+ri_keepalive_read() {
+    [ -f "$1" ] || return 0
+    tr -d '\r' < "$1" | sed -n 's/^[[:space:]]*"keepalive":[[:space:]]*"\{0,1\}\([a-z]*\)"\{0,1\},\{0,1\}[[:space:]]*$/\1/p' | head -n 1
+}
+
 ri_write() {
     local path="$1" tmp
     tmp="$path.tmp.$$"
@@ -59,7 +68,11 @@ ri_write() {
         printf '  "seconds": %s,\n' "$(ri_json_num "${RI_SECONDS:-}")"
         printf '  "every_ms": %s,\n' "$(ri_json_num "${RI_EVERY_MS:-}")"
         printf '  "ends_at": %s,\n' "$(ri_json_opt_str "${RI_ENDS_AT:-}")"
-        if [ "${RI_KEEPALIVE:-0}" = 1 ]; then printf '  "keepalive": true,\n'; else printf '  "keepalive": false,\n'; fi
+        case "${RI_KEEPALIVE:-0}" in
+            1|true) printf '  "keepalive": true,\n';;
+            starting|failing|failed) printf '  "keepalive": "%s",\n' "$RI_KEEPALIVE";;
+            *) printf '  "keepalive": false,\n';;
+        esac
         printf '  "keepalive_log": %s,\n' "$(ri_json_opt_str "${RI_KEEPALIVE_LOG:-}")"
         if [ -n "${RI_EXIT:-}" ]; then
             printf '  "exit": %s,\n' "$(ri_json_str "$RI_EXIT")"

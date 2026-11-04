@@ -3,7 +3,7 @@
 // (tools/build.ps1|.sh) compiles this file on its own with a host compiler, and the pipeline's python packer
 // (scripts/pack_beta.py read_app_defines, scripts/repack_app.py) reads the same lines as text. So: include only
 // oct_app_version.h, oct_app_categories.h and app_save.h here, and write every value as a literal or one of the
-// macros below. Requires octavios dev >= 609d5ae (oct_app_version.h must exist; the plugin's api/include has it). Reference: ../API.md.
+// macros below. Requires the current engine (oct_app_version.h must exist; the plugin's api/include has it). Reference: ../API.md.
 #include "oct_app_version.h"
 #include "oct_app_categories.h"
 

@@ -108,8 +108,8 @@ bash <skills>/scripts/check_env.sh
 ```
 
 It reports, and changes nothing: the simulator (`~/.wowcube/sim/<version>/<os>/wowcube-sim` present and
-answering `--version` with exactly the version `api/SOURCE` names: a stale build is not OK; else `[MISSING]` with the `get_sim` command, even when `get_sim` could
-install it (the plugin carries it prebuilt) or build it, because installing it waits for the approval); the plugin compiler (Windows: `clang-cl` plus the Visual Studio
+answering `--version` with exactly the version `api/SOURCE` names: a stale build is not OK; else `[MISSING]` with the `get_sim` command, even though `get_sim`
+only copies the prebuilt simulator the plugin carries, because installing it waits for the approval); the plugin compiler (Windows: `clang-cl` plus the Visual Studio
 2022 C++ x64 tools; macOS: the Xcode command-line tools; Linux: g++ or clang++); the
 device build (CMake, Ninja, `arm-none-eabi-g++`); python with Pillow/numpy/pytoshop/psd-tools;
 ffmpeg; for information the Codex CLI login, Node.js + Playwright, long-path risk. Linux
@@ -137,8 +137,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skills>\scripts\new_app.ps1
 bash <skills>/scripts/new_app.sh --name <game> --workspace <ws> --smoke [--get-sim] [--with-save] [--title "<Title>"] [--category game|screensaver|test]
 ```
 
-`-GetSim` / `--get-sim` only after the user's one-time environment approval (it may download or
-build the simulator). Without it a missing simulator stops `new_app` before it creates anything,
+`-GetSim` / `--get-sim` only after the user's one-time environment approval (it installs the prebuilt
+simulator the plugin carries into `~/.wowcube/sim/`; nothing is downloaded or built). Without it a missing simulator stops `new_app` before it creates anything,
 with the `get_sim` command to run.
 
 What it does, in order:
@@ -165,8 +165,6 @@ What it does, in order:
    runs `tools/sim/get_sim.*` (installs the plugin's prebuilt simulator) only
    with `-GetSim` / `--get-sim`; then `tools/sim/build_game.*` compiles the game into its plugin
    (`out/sim/<app>.dll|.so|.dylib`). This proves the toolchain and that the app compiles.
-   `-VisibleSim` prints the command that opens the simulator for the user; nothing is
-   started.
 6. **`-Smoke` / `--smoke`**: one hidden, silent run of 15 s (`-SmokeSeconds`) with a PNG
    of all 24 screens every second (`tools/sim/run_hidden.*`: Windows polls the windows
    every 50 ms and kills by PID if one is visible; Linux runs under `xvfb-run` with X11
@@ -331,7 +329,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skills>\scripts\build_devic
 bash <skills>/scripts/build_device.sh --app-dir <ws>/app_<game> [--builder auto|octpack|python] [--out <path>.oct]
 ```
 
-- **The default builder (`python`) needs only this plugin and the ARM toolchain**:
+- **The default builder (`auto`) picks `python` here, which needs only this plugin and the ARM toolchain**
+  (`auto` takes `octpack` only for a developer's own SDK checkout, below):
   a CMake + Ninja build (`arm-none-eabi-g++`) of `api/apps` against the public game API
   (`api/include`) into `app_<game>/out`, then `scripts/pack_beta.py --build-oct`. The art
   Stage 3 packed (`index.bin`, `art/packed`, `sound/assets`) goes in as it is. It stamps
@@ -397,14 +396,13 @@ by SHA-256 (exit 3 = mismatch: upload again; exit 2 = the upload failed: report 
 retry loop). Give the user the QR code and the link with one line: "Scan it with your phone (or open the
 link on it): the WowCube app installs the game on your cube." Details: `cube_orchestrator/references/DELIVERY.md` §3.
 
-`tools/cube_upload/` (a Bluetooth upload through the simulator) is internal and legacy, never offered.
-
 ### Step 4: on-device checklist
 
 Give the user the on-device checklist (`DELIVERY.md` §4): the icon and title in
 the launcher; taps on each face (and per screen where designed), twists both ways, half
 twists ignored, tilt; music and effects together and positional sounds from the right
-place (the simulator plays only module 0, so the cube is the first real test of the mix);
+place (the cube is the first place where all eight modules play together, so it is the first real
+test of the mix);
 HUD upright on the side faces; animations smooth; saves survive a shake to the launcher
 and a relaunch; idle pause after ~60 s; five minutes without a freeze.
 

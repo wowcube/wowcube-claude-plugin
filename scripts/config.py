@@ -175,7 +175,7 @@ MAP_MARKER_LABEL: dict[str, int] = {
 # 0xFF000000..0xFF000700: the rates came back 1..8, and the record that also
 # carried `rate10` came back 10.
 #
-# This is not cosmetic. `oct_scene.h` makes the effective frame delay
+# This is not cosmetic. The engine's scene code makes the effective frame delay
 # `bmp->Rate * spr->FrameRate`, so a group that loses its colour label plays
 # 4-10x too fast. In `app_ref_b` 66 of the 70 non-default rates come from
 # the sheet colour alone (yellow -> 4, green -> 5) and only 4 from `!rate10`.
@@ -302,8 +302,8 @@ PSL_TYPE_FONT  = 3               # BMFont PSL: one record per glyph
 # psd.exe copies the marker layer's rect into the PSL verbatim, except when the
 # layer is exactly 1x1: then it writes a SIDE_MARKER_MIN_SIZE square whose
 # origin is shifted by a per-side constant. Measured by rewriting the ~sideN
-# rects of a real map PSD and re-running psd.exe (see
-# tests/test_map_place_geometry.py): the shift follows the side *index* — not
+# rects of a real map PSD and re-running psd.exe (pinned by the
+# development repository's tests): the shift follows the side *index* — not
 # the marker's position, not the layer order — and fires only for 1x1 (1x2,
 # 2x1, 1x3, 3x1 and everything larger pass through untouched).
 #
@@ -373,7 +373,7 @@ MAP_FILENAME_PREFIX = 'map_'
 
 # Placement maps the launcher looks up BY NAME, so a PSD called this is a map
 # whatever its filename prefix. The engine reads "ico" directly
-# (oct_shell.h: OCT_external_map(guid1, guid2, "ico")); "ahover" is its hover
+# (the launcher: OCT_external_map(guid1, guid2, "ico")); "ahover" is its hover
 # twin. Reference corpus check: art/!pack.bat runs psd.exe -map on exactly
 # ico.psd and ahover.psd.
 RESERVED_MAP_NAMES = ('ico', 'ahover')

@@ -17,7 +17,7 @@ The "I replaced the assets — rebuild" cycle in one command:
      build_pipeline.py pack;
   2. bump the version: by default the MINOR (+1, patch back to 0; the
      repository's release rule), `--bump patch` for the patch instead:
-     APP_VERSION_MINOR / _PATCH in src/app_metadata.h (octavios dev layout),
+     APP_VERSION_MINOR / _PATCH in src/app_metadata.h (current app layout),
      else the literal OCT_APP_SEMVER(...) or legacy integer in src/app.h. The
      cube's catalog compares versions exactly on install, so an un-bumped
      rebuild may not apply over an already-installed app, and the .oct always
@@ -72,7 +72,7 @@ def bump_patch(app_h_path: str | Path) -> int:
 
     Three layouts, newest first (the cube's catalog compares versions on
     install, so an un-bumped rebuild may not apply over an installed app):
-      1. octavios dev: `#define APP_VERSION_PATCH <n>` in src/app_metadata.h
+      1. current layout: `#define APP_VERSION_PATCH <n>` in src/app_metadata.h
          (or app.h), APP_VERSION = OCT_APP_SEMVER(MAJOR, MINOR, PATCH);
       2. `#define APP_VERSION OCT_APP_SEMVER(<ma>, <mi>, <n>)` with literals;
       3. legacy `#define APP_VERSION <int>` (102 = v1.02): +1 on the integer.

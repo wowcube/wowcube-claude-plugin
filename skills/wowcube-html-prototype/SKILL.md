@@ -1,15 +1,15 @@
 ---
 name: "wowcube-html-prototype"
-description: "Building a browser prototype of a WowCube game on the cube.js demo engine: a 3D cube and a 2D net of 24 screens, twists, pat, tilt, autopilot and the ?cinema / ?autoplay hooks a video recording needs. Use for requests to BUILD the page, like \"make an html prototype\", \"web prototype\", \"concept in the browser\", \"show the mechanic in html\", \"let's test the mechanic before coding on the cube\". Not for recording or rendering videos (also of a prototype): that is wowcube-demo-video."
+description: "Building a browser prototype of a WowCube game on the cube.js demo engine: a 3D cube and a 2D net of 24 screens, twists, tap, tilt, autopilot and the ?cinema / ?autoplay hooks a video recording needs. Use for requests to BUILD the page, like \"make an html prototype\", \"web prototype\", \"concept in the browser\", \"show the mechanic in html\", \"let's test the mechanic before coding on the cube\". Not for recording or rendering videos (also of a prototype): that is wowcube-demo-video."
 ---
 
 # WowCube game HTML prototype
 
 A prototype is a playable page where the mechanic is tested before any cube code, and from which a
 video is recorded later. The cube game's logic then follows the prototype. The demo engine is in the
-skill: `assets/cube.js`, `assets/cube.css`; a full prototype example with autopilot and `?cinema` is
-`references/example-maze_box.html` (it links `common/cube.*` like a real page: to open it in place, put
-it next to a `common/` copy of `assets/`).
+skill: `assets/cube.js`, `assets/cube.css`; its API is `references/cubedemo-api.md`, and the page structure,
+autopilot and `?cinema` layout below are what a full prototype needs (`references/layout-html.jpg` shows the
+video layout).
 
 `<skills>` = the folder two levels above this SKILL.md (the plugin root; `${CLAUDE_PLUGIN_ROOT}` when the host exports it); resolve it on every entry, never store it. This skill's folder is
 `<skills>/skills/wowcube-html-prototype/`.
@@ -17,7 +17,7 @@ it next to a `common/` copy of `assets/`).
 ## Where to put it
 
 The page always sits next to a `common/` folder holding copies of this skill's `assets/cube.js` and
-`assets/cube.css`; the page links `common/cube.js` and `common/cube.css` (as the example does).
+`assets/cube.css`; the page links `common/cube.js` and `common/cube.css`.
 
 - **A game in the WowCube pipeline** (`cube_orchestrator` / `cube_game-designer` Step 5, before any
   cube code): `plans/<game>_prototype.html` + `plans/common/`, next to the GDD.
@@ -34,7 +34,7 @@ The page always sits next to a `common/` folder holding copies of this skill's `
 One HTML file, self-contained; only `cube.js` + `cube.css` are shared.
 
 1. `<head>`: `<title><Game> — WowCube</title>`, `cube.css`, its own `<style>` with a game class prefix
-   (`mb-`, `qs-`, `lp-`): HUD chips, bottom caption (`*-cap`), big title (`*-big`), controls legend
+   (two letters of the game, e.g. `ff-` for a fireflies game): HUD chips, bottom caption (`*-cap`), big title (`*-big`), controls legend
    (`*-legend`, `*-row` with `.is-on` for the active gesture). A
    `/* Video layout (?cinema) */` block with `body.is-cinema …` rules: large cube on the left, net and
    legend on the right, 1280 x 720 (see `references/layout-html.jpg`).
@@ -42,7 +42,7 @@ One HTML file, self-contained; only `cube.js` + `cube.css` are shared.
    `/* ============================== Config ============================== */`:
    - **Logic**: pure logic with no DOM (`const XxLogic = (function () { … })()`): board model, rules,
      solver/hint. It is ported to C later, so it never touches the page.
-   - **Levels**: level data as an array of objects (`{ id: '1-1', name: 'First Bite', par: 1, … }`).
+   - **Levels**: level data as an array of objects (`{ id: '1-1', name: 'First Glow', par: 1, … }`).
    - **Config**: all numbers and colours in `Object.freeze({...})` UPPER_SNAKE constants (`CONFIG`,
      `VIEW`, `PALETTE`, `PHYS`): no magic numbers in code, each with a comment stating its units.
    - **State**: a single `st` object.
@@ -62,10 +62,12 @@ One HTML file, self-contained; only `cube.js` + `cube.css` are shared.
   `screen`, `evaluate`); **interactive**, where each screen is drawn by position (`paint`), twists are
   events (`onTwist`), `tick(dt)` advances animation, and gravity comes from the 3D view tilt
   (`api.gravity()`).
-- Input: twist (keys U D L R F B, Shift for counter-clockwise), pat (click a screen in 3D or on the net),
-  tilt (drag the cube, arrow keys). Pat applies to a whole face: highlight all 4 screens of the face.
-- Texts and captions are in English, the gesture is **pat** (buttons `Pat · knock`, hints
-  `Double pat to …`).
+- Input: twist (keys U D L R F B, Shift for counter-clockwise), tap (click a screen in 3D or on the net),
+  tilt (drag the cube, arrow keys). The tap callback (`onTap`, also accepted as `onPat`) gets the screen that
+  was clicked (`face`, `row`, `col`, `slot`): follow the GDD. When it designs taps per screen, react to that
+  screen only; when it designs taps per face, react to the face and highlight all 4 of its screens.
+- Texts and captions are in English, the gesture is **tap** (buttons `Tap · knock`, hints
+  `Double tap to …`).
 - Art is placeholders drawn in code; finished images go to `img/<game>/` next to the page.
 - Sound uses `api.tone()` through a `sfx(freqs, ms, wave)` function and is silent with `?video`.
 - Keep the real cube's constraints in the prototype: 240 px screens, borders between screens,
@@ -86,15 +88,16 @@ The scenario is an array of steps; each shows a caption and performs one action:
 
 ```js
 const SCRIPT = () => [
-  { big: 'MAZE BOX', sub: 'A glass house inside the WowCube', still: true, hold: 3.0 },
-  { cap: 'Tilt: the ball rolls through a door…', sub: 'Gravity is real', act: 'tilt', go: [room(1, 3, 3)], until: inRoom([1, 2, 3]) },
-  { cap: 'Twist the upper floors', sub: 'Twist U′ → over an open hatch', act: 'twist', twist: "U'", hold: 1.6 },
+  { big: 'FIREFLY FOX', sub: 'Catch the night lights on the WowCube', still: true, hold: 3.0 },
+  { cap: 'Tilt: the fox runs downhill…', sub: 'Gravity is real', act: 'tilt', go: [spot(1, 2, 0)], until: nearFirefly(1) },
+  { cap: 'Tap the screen with the firefly', sub: 'Tap → the fox jumps', act: 'tap', tap: [1, 0, 1], hold: 1.2 },
+  { cap: 'Twist the upper layer', sub: "Twist U' → new fireflies come round", act: 'twist', twist: "U'", hold: 1.6 },
   { big: 'LEVEL COMPLETE', still: true, spin: 0.6, hold: 4.5 },
 ];
 ```
 
 `Pilot` walks through the steps: sets `cap/sub` or `big`, highlights `act` in the legend, performs the
-action (`twist`, moving towards a target, pat), waits for `until()` and `hold` seconds. At the end it
+action (`twist`, moving towards a target, tap), waits for `until()` and `hold` seconds. At the end it
 sets `window.__demoDone = true` (the recording stops on it). The autopilot runs the page's **real
 rules**: no fake animations. Scenario: title card, each mechanic once with a caption, a mistake and its
 fix, victory; 35–90 seconds.
@@ -116,13 +119,11 @@ Playwright is never installed into the plugin folder: install it once under
 The recorder looks for it in `$WOWCUBE_NODE_DIR`, `~/.wowcube/node`, the workspace, then its own folder.
 
 ```bash
-node <skills>/skills/wowcube-html-prototype/scripts/record_html.mjs <dir>/<game>_prototype.html docs/demo/<game>_demo.mp4 \
+node <skills>/skills/wowcube-html-prototype/scripts/record_html.mjs <dir>/<game>_prototype.html <ws>/video/<game>_demo.mp4 \
      --seconds 120 --stopWhen "window.__demoDone"
 ```
 
 This is the only copy of the recorder: `wowcube-demo-video` (method A) runs it from here and owns the
-video format and where videos go.
+video format and where videos go (a pipeline workspace: `<ws>/video/`; a game repository: `docs/demo/`).
 
-`?cinema&autoplay&video` (the recorder default; `video` = silent) at 1280 x 720 with scale 1.5 gives 1920 x 1080. The video goes to the game's
-`docs/demo/` (`docs/demo/` and `*.mp4` are in `.gitignore`); stills for documents:
-`ffmpeg -ss <sec> -i <mp4> -frames:v 1 -vf scale=1280:-1 -q:v 3 docs/img/<game>_<scene>.jpg`.
+`?cinema&autoplay&video` (the recorder default; `video` = silent) at 1280 x 720 with scale 1.5 gives 1920 x 1080.

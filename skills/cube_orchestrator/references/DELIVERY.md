@@ -84,7 +84,7 @@ app folder (an older simulator wrote one at every start) is never the deliverabl
 The cube does not get the game from this computer. The user installs it from their phone: the finished
 `.oct` goes to WowCube's servers, the user gets a QR code and a link, scans the code with their
 phone (or opens the link on it), and the WowCube app installs the game on the cube connected to that phone.
-Which cube is connected to the phone is the user's business; nothing here asks about cubes or Bluetooth.
+Which cube is connected to the phone is the user's business; nothing here asks about cubes.
 
 **Ask once** before the first upload of a game (uploading sends the game to WowCube's servers): "Make an install link and a QR code so you can put the game on
 your cube from your phone? (The game file is sent to WowCube's servers for that.)" A yes covers later uploads of the same game in this
@@ -107,17 +107,14 @@ python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify
   "Scan it with your phone, or open the link on it: the WowCube app installs the game on your cube."
   The link is the user's: never post it anywhere.
 
-`tools/cube_upload/` (Bluetooth upload through the simulator) is internal and legacy: never part of the
-user's flow.
-
 ## 4. On-device checklist (give it to the user)
 
 - The launcher shows the game's icon and title; the game starts.
 - Controls on the real hardware: taps on each face (and per screen where designed),
   twists both ways, half twists ignored, tilt.
 - Sound: music and effects together, balanced; positional sounds come from the right
-  place (the simulator plays only module 0, so the cube is the first real test of the
-  mix).
+  place (the automatic checks cannot hear the game or play sound from all eight parts of the
+  cube at once: the cube is the first real test of the mix).
 - Orientation: the HUD is upright on the side faces; the playfield follows the face
   that is up.
 - Smoothness: animations at their speed, no hiccups on full-screen animations.
@@ -152,7 +149,7 @@ The video is silent (no audio is ever captured). Give the user the path; do not 
 it. A presentation video in the standard demo format (1920x1080: 3D cube, unfolded net, controls legend,
 captions) comes from the `wowcube-demo-video` skill: method A records the HTML prototype (Node + Playwright:
 a one-time install the user approves; the external path), methods B/C capture the real game with a bot on a
-host g++ build and need the internal SDK (its `oct_test_shim.h` is not in this kit).
+host g++ build and need the internal SDK (its host test shim is not in this kit).
 
 ## 6. Balance loop (after the first playable build)
 

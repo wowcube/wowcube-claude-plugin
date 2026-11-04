@@ -29,17 +29,26 @@
   python art.py waive    <spec> --only a[,b] --check style[,set_area] --reason "<what the picture shows>"
                                                     a numeric FAIL that a look at the picture shows is false:
                                                     qa reports it WAIVED and does not count it while the
-                                                    final image is unchanged (its hash is stored); waivable
-                                                    checks: style, fill, set_centroid, set_area, set_height,
-                                                    set_colour (never size, key, alpha, cut-out, missing,
-                                                    empty, kept-file checks); --drop removes; no --only lists
+                                                    final image is unchanged (its hash is stored), and for
+                                                    a set check its reference frame, for style the style
+                                                    profile; waivable checks: style, fill, set_centroid,
+                                                    set_area, set_height, set_colour (never size, key,
+                                                    alpha, cut-out, opaque, missing, empty, kept-file
+                                                    checks); --under-budget records a REAL failure
+                                                    accepted because the image budget is spent (reported
+                                                    apart); --drop removes; no --only lists
   python art.py review   <spec>                     <workspace>/review.html for the artist
   python art.py feedback <spec> --file fb.json      fold the page's "Copy feedback" JSON into fixes.json
   python art.py all      <spec> [gen options]       gen -> process -> qa -> review
   python art.py budget   <spec>                     image budget: requests spent, the cap and where it comes from
+  python art.py budget   <spec> --video <anim> --quote
+                                                    does one animation video job fit? (records nothing;
+                                                    exit 4 when it does not)
   python art.py budget   <spec> --video <anim> [--video-frames N] [--credits C]
-                                                    record one animation video job before it is submitted
-                                                    (counts as its N frames; exit 4 when it does not fit)
+                                                    after the user's yes: record the job once, right before
+                                                    it is submitted (counts the frames it replaces; an
+                                                    approved frame 0 is kept and not counted); --drop
+                                                    removes a job that was never submitted
   python art.py sheet    <spec> [--only a,b] [--set s] [--cols N] [--padding 2] [--name sheet]
                                                     the finished images on one grid PNG + a JSON atlas
                                                     (<workspace>/sheet/<name>.png + <name>.json: frames
@@ -47,7 +56,7 @@
   python art.py sizes    [<spec>]                   the WowCube size guide; with a spec, every asset's size
                                                     checked against its role (exit 1 on a size that cannot work)
   python art.py slice    <sheet.png> (--cell WxH | --grid COLSxROWS | --atlas a.json) [--names a,b,..]
-                         [--padding P] [--margin M] [--out dir]
+                         [--padding P (default 0)] [--margin M] [--out dir]
                                                     cut a sprite sheet someone sent into one named PNG per
                                                     sprite (empty cells skipped), ready to use as drawings
   python art.py doctor   [<spec>] --no-codex        art drawn in code or the artist's own: Codex is a note
@@ -883,20 +892,42 @@ def cmd_qa(args) -> int:
     return 1 if fails else 0
 
 
+def _measured_refs(p) -> dict:
+    """{asset: {check: reference frame}} from the last `qa` run (qa/report.json): the frame each set number was
+    measured against, which a set waiver binds."""
+    f = p.workspace / "qa" / "report.json"
+    if not f.is_file():
+        return {}
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except ValueError:
+        return {}
+    out: dict = {}
+    for name, r in (data.get("assets") or {}).items():
+        for c in r.get("checks", []) if isinstance(r, dict) else []:
+            if isinstance(c, dict) and c.get("id"):
+                out.setdefault(name, {})[c["id"]] = c.get("ref")
+    return out
+
+
 def cmd_waive(args) -> int:
     """Record (or with --drop remove) a waiver: a numeric QA check that a look at the picture showed to be false
-    for this asset. Bound to the final image's hash: redraw or reprocess it and the check counts again."""
+    for this asset. It ends when the asset's final image changes, and also when what the number is measured
+    against changes: a set check's reference frame (another frame, or a redrawn one), the style profile for
+    `style` (new or changed anchors). With --under-budget it records a REAL failure accepted because the image
+    budget is spent (`accepted_under_budget`, reported apart from waivers; STAGE3_ASSETS.md §3)."""
     import datetime
     p, _ = load(args)
     waivers = art_qa.load_waivers(p)
+    prof_hash = art_qa.profile_hash(art_style.load_profile(style_dir(p)))
     if not args.only:
         if not waivers:
             print("no waivers")
         for name, checks in sorted(waivers.items()):
             for cid, w in sorted(checks.items()):
-                f = final_dir(p) / f"{name}.png"
-                live = f.exists() and art_qa.file_hash(f) == w.get("sha256")
-                print(f"{name}: {cid} - {w.get('reason', '')}" + ("" if live else "   (STALE: the image changed)"))
+                stale = art_qa.waiver_stale(w, cid, final_dir(p), name, prof_hash=prof_hash)
+                kind = "  [accepted under budget]" if w.get("kind") == "accepted_under_budget" else ""
+                print(f"{name}: {cid} - {w.get('reason', '')}{kind}" + ("" if stale is None else f"   (STALE: {stale})"))
         return 0
     checks = [c.strip() for c in (args.check or "").split(",") if c.strip()]
     if not checks:
@@ -908,10 +939,19 @@ def cmd_waive(args) -> int:
         if c not in art_qa.WAIVABLE:
             raise SystemExit(f"waive: unknown check '{c}' (waivable: {', '.join(art_qa.WAIVABLE)})")
     assets = pick(p, args.only, None)
+    under = bool(getattr(args, "under_budget", False))
     if not args.drop:
         reason = (args.reason or "").strip()
         if not reason or "\n" in reason:
             raise SystemExit('waive needs --reason "<one line: what you saw in the picture>"')
+        if under:
+            led = ledger(p, args)
+            led.refresh()
+            if led.budget is None or led.spent < led.budget:
+                raise SystemExit(f"waive --under-budget: the image budget is not spent ({led.spent} of "
+                                 f"{led.budget if led.budget is not None else 'no cap'}): fix the failure and "
+                                 f"redraw; only a spent budget lets a real failure be accepted")
+    refs = _measured_refs(p)
     for a in assets:
         f = final_dir(p) / f"{a.name}.png"
         if args.drop:
@@ -923,13 +963,25 @@ def cmd_waive(args) -> int:
         if not f.exists():
             raise SystemExit(f"waive: {a.name} has no final image (run process, look at it, then waive)")
         for c in checks:
-            waivers.setdefault(a.name, {})[c] = {"reason": reason, "sha256": art_qa.file_hash(f),
-                                                 "date": datetime.date.today().isoformat()}
+            w = {"reason": reason, "sha256": art_qa.file_hash(f), "date": datetime.date.today().isoformat()}
+            if c.startswith("set_"):
+                ref = (refs.get(a.name) or {}).get(c)
+                if not ref:
+                    raise SystemExit(f"waive: qa has no {c} result for {a.name} (qa/report.json): run qa, look at "
+                                     f"the sheets, then waive")
+                rf = final_dir(p) / f"{ref}.png"
+                w.update(ref=ref, ref_sha256=art_qa.file_hash(rf) if rf.exists() else None)
+            elif c == "style" and prof_hash:
+                w["profile_sha256"] = prof_hash
+            if under:
+                w["kind"] = "accepted_under_budget"
+            waivers.setdefault(a.name, {})[c] = w
     where = art_qa.save_waivers(p, waivers)
-    verb = "dropped" if args.drop else "waived"
+    verb = "dropped" if args.drop else ("accepted under budget" if under else "waived")
     print(f"{verb}: {', '.join(a.name for a in assets)}: {', '.join(checks)} -> {where}")
     if not args.drop:
-        print("  holds while the final image is unchanged; run qa again")
+        print("  holds while the final image is unchanged (and, for a set check, its reference frame; for style, "
+              "the style profile); run qa again")
     return 0
 
 
@@ -1002,7 +1054,8 @@ def cmd_slice(args) -> int:
         elif args.cell or args.grid:
             cell = _wh(args.cell, "--cell") if args.cell else None
             grid = _wh(args.grid, "--grid") if args.grid else None
-            rects = [(None, r) for r in _cells(sheet.width, sheet.height, cell, grid, args.padding, args.margin)]
+            pad = 0 if args.padding is None else args.padding     # a sheet someone sent: cells touch unless told
+            rects = [(None, r) for r in _cells(sheet.width, sheet.height, cell, grid, pad, args.margin)]
         else:
             print("ERROR: say how the sheet is laid out: --cell WxH, --grid COLSxROWS or --atlas <json>",
                   file=sys.stderr)
@@ -1134,7 +1187,7 @@ def cmd_sheet(args) -> int:
         with Image.open(src / f"{a.name}.png") as im:
             items.append((a.name, im.convert("RGBA"), a.set))
     try:
-        sheet, atlas = build_sheet(items, args.cols, args.padding)
+        sheet, atlas = build_sheet(items, args.cols, 2 if args.padding is None else args.padding)
     except ValueError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
@@ -1154,26 +1207,71 @@ def cmd_sheet(args) -> int:
     return 0
 
 
+def approved_first_frame(p, anim: str) -> Path | None:
+    """The image of an animation's frame 0 that already exists (the approved still a video animates from):
+    its final image, its raw image, or (art.json) its drawing in drawn/; None when it has none. A video job
+    keeps it and replaces only the other frames (video_to_frames.py, references/ANIMATION_VIDEO.md)."""
+    first = f"{anim}_00"
+    if not any(a.name == first for a in p.assets):
+        return None
+    places = [final_dir(p) / f"{first}.png", p.workspace / "raw" / f"{first}.png"]
+    if p.kind != "cube-manifest":
+        places.append(p.root / "drawn" / f"{first}.png")
+    return next((f for f in places if f.is_file()), None)
+
+
+def video_frame_count(p, anim: str) -> tuple[list[str], int, Path | None]:
+    """(the spec's frames of `anim`, how many a video job replaces, the kept approved frame 0 or None)."""
+    rx = re.compile(rf"^{re.escape(anim)}_\d{{2,}}$")
+    frames = [a.name for a in p.assets if rx.match(a.name)]
+    first = approved_first_frame(p, anim) if frames else None
+    return frames, len(frames) - (1 if first is not None else 0), first
+
+
 def cmd_budget(args) -> int:
     p, _ = load(args)
     led = ledger(p, args)
     if args.video:
-        # an animation from a video service (references/ANIMATION_VIDEO.md): one job, recorded BEFORE it is
-        # submitted, counting the frames it replaces (the spec's <anim>_NN frames, or --video-frames)
-        rx = re.compile(rf"^{re.escape(args.video)}_\d{{2,}}$")
-        frames = [a.name for a in p.assets if rx.match(a.name)]
-        count = args.video_frames if args.video_frames is not None else len(frames)
+        # an animation from a video service (references/ANIMATION_VIDEO.md): one job counting the frames it
+        # replaces (the spec's <anim>_NN frames minus an approved frame 0 the clip keeps, or --video-frames).
+        # --quote checks it and records nothing; then, after the user's yes, the job is recorded ONCE (with
+        # --credits) right before it is submitted; --drop removes a recorded job that was never submitted.
+        if args.drop:
+            gone = led.drop_last(args.video, "video")
+            if gone is None:
+                print(f"ERROR: no video job for {args.video} in the ledger {led.path}", file=sys.stderr)
+                return 1
+            print(f"video job for {args.video} removed ({gone.get('count', 1)} image(s)): only for a job that "
+                  f"was never submitted")
+            print(led.status() + ("" if led.remaining() is None else f"; {led.remaining()} left"))
+            return 0
+        frames, count, first = video_frame_count(p, args.video)
+        if args.video_frames is not None:
+            count = args.video_frames
         if count < 1:
-            print(f"ERROR: no frames named {args.video}_00, {args.video}_01, ... in the spec: give --video-frames N",
-                  file=sys.stderr)
+            why = (f"only {args.video}_00, which is already approved: nothing for a video to replace" if frames else
+                   f"no frames named {args.video}_00, {args.video}_01, ... in the spec: give --video-frames N")
+            print(f"ERROR: {why}", file=sys.stderr)
             return 1
-        extra = {"credits": args.credits} if args.credits is not None else None
-        ok, why = led.charge(args.video, "video", 1, count=count, extra=extra)
-        if not ok:
-            print(f"ERROR: {why}. Nothing was recorded: do not submit the video job. Ask the user before raising "
-                  f"the budget.", file=sys.stderr)
-            return art_budget.EXIT_OVER_BUDGET
-        print(f"video job for {args.video} recorded as {count} image(s)")
+        kept = f" (frame 0 kept: {first.name}, approved)" if first is not None and args.video_frames is None else ""
+        if args.quote:
+            led.refresh()
+            if not led.can_afford(count):
+                print(f"ERROR: the video job for {args.video} counts {count} image(s) and does not fit: "
+                      f"{led.spent} of {led.cap} spent. Do not submit; ask the user before raising the budget.",
+                      file=sys.stderr)
+                return art_budget.EXIT_OVER_BUDGET
+            print(f"video job for {args.video}: {count} image(s){kept}; fits (nothing recorded). Ask the user "
+                  f"about the quoted credits; on their yes record it with --credits right before submitting.")
+        else:
+            extra = {"credits": args.credits} if args.credits is not None else None
+            ok, why = led.charge(args.video, "video", 1, count=count, extra=extra)
+            if not ok:
+                print(f"ERROR: {why}. Nothing was recorded: do not submit the video job. Ask the user before "
+                      f"raising the budget.", file=sys.stderr)
+                return art_budget.EXIT_OVER_BUDGET
+            print(f"video job for {args.video} recorded as {count} image(s){kept}; never submitted after all: "
+                  f"--drop removes it")
     print(led.status() + ("" if led.remaining() is None else f"; {led.remaining()} left"))
     return 0
 
@@ -1214,14 +1312,19 @@ def main(argv=None) -> int:
     ap.add_argument("--over-budget", action="store_true",
                     help="gen/candidates: draw past the image budget (only on the user's yes; marked in the ledger)")
     ap.add_argument("--video", default=None,
-                    help="budget: record one animation video job for this animation (frames <video>_NN) before "
-                         "it is submitted; it counts as the frames it replaces (references/ANIMATION_VIDEO.md)")
+                    help="budget: one animation video job for this animation (frames <video>_NN): --quote checks "
+                         "it, then it is recorded once right before it is submitted; it counts as the frames it "
+                         "replaces, an approved frame 0 excluded (references/ANIMATION_VIDEO.md)")
+    ap.add_argument("--quote", action="store_true",
+                    help="budget --video: check that the job fits and print its count; records nothing")
     ap.add_argument("--video-frames", type=int, default=None, help="budget --video: images it counts (default: the "
                                                             "spec's frames of that animation)")
-    ap.add_argument("--credits", type=float, default=None, help="budget --video: the service's quoted credits "
-                                                                "(noted in the ledger only)")
+    ap.add_argument("--credits", type=float, default=None, help="budget --video: the service's quoted credits the "
+                                                                "user agreed to (noted in the ledger only)")
     ap.add_argument("--cols", type=int, default=None, help="sheet: columns (default: a square-ish grid)")
-    ap.add_argument("--padding", type=int, default=2, help="sheet: transparent pixels between cells (default 2)")
+    ap.add_argument("--padding", type=int, default=None,
+                    help="sheet: transparent pixels between cells (default 2); slice: pixels between the sheet's "
+                         "cells (default 0)")
     ap.add_argument("--name", default=None, help="sheet: file name without extension (default: the --set, else sheet)")
     ap.add_argument("--cell", default=None, help="slice: the cell size WxH")
     ap.add_argument("--grid", default=None, help="slice: COLSxROWS (the cell size follows from the sheet)")
@@ -1232,7 +1335,11 @@ def main(argv=None) -> int:
     ap.add_argument("--check", default=None, help="waive: check id(s), comma-separated (style, fill, set_centroid, "
                                                   "set_area, set_height, set_colour)")
     ap.add_argument("--reason", default=None, help="waive: one line - what the picture shows (why the number is wrong)")
-    ap.add_argument("--drop", action="store_true", help="waive: remove the waiver instead")
+    ap.add_argument("--drop", action="store_true", help="waive: remove the waiver instead; budget --video: remove "
+                                                        "the job's entry (only a job that was never submitted)")
+    ap.add_argument("--under-budget", action="store_true",
+                    help="waive: record a REAL failure accepted because the image budget is spent "
+                         "(accepted_under_budget), not a false number; refused while the budget has images left")
     ap.add_argument("--no-codex", action="store_true",
                     help="doctor: the art is drawn in code or is the artist's own: Codex is not needed "
                          "(its lines become notes, not failures)")

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Scaffold app_<name> from the AI template in the octavios dev layout, pack its assets, and prove the
+    Scaffold app_<name> from the AI template in the app layout, pack its assets, and prove the
     game builds and runs in the standalone simulator - the infra gate before the first technical prompt.
     Never opens a window. Needs no octavios or telemetry checkout.
 

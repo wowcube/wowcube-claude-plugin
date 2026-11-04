@@ -19,7 +19,8 @@ art pipeline takes like any other drawing:
   6. writes one PNG per frame, a sprite sheet + JSON atlas (the format `art.py sheet` writes), a
      preview GIF on a dark background at the cube's x2 display scale, and prints the loop seam:
      the mean difference (0-255) between the first frame and the clip's last frame, next to the
-     typical step between two picked frames.
+     typical step between two picked frames, and the wrap (the jump from the last picked frame
+     back to the first when the animation restarts).
 
 The frames are drawings: with --spec they go where the pipeline reads them (a WowCube manifest:
 <workspace>/raw/<name>.png, then `art.py process`; an art.json project: <project>/drawn/, used as
@@ -32,6 +33,11 @@ The frames are drawings: with --spec they go where the pipeline reads them (a Wo
 Frame names: <name>_00, <name>_01, ... (the pipeline's animation naming, manifest_schema.py); with
 --spec, the names of the spec's frames of that animation, in order. Existing frames are only
 overwritten with --force.
+
+The first frame: the video animates the approved still of frame 0, so an existing <name>_00 (with
+--spec: its final, raw or drawn image; else the file in --out) is KEPT by default and only the other
+frames are written (`art.py budget --video` counts only those). --no-keep-first replaces it with the
+clip's first frame (needs --force when it exists); --keep-first insists on keeping it.
 
 Exit 0 = done; 1 = the clip could not be read or nothing was found in it; 2 = bad arguments;
 3 = ffmpeg / ffprobe not found.
@@ -96,9 +102,10 @@ def parse_range(text: str) -> tuple[float, float]:
 
 
 def frames_from_spec(spec: Path, base: str, workspace=None):
-    """(frame names in order, (w, h), frames folder, sheet folder, kind) for the animation `base` of an
-    art.json project or a WowCube manifest."""
+    """(frame names in order, (w, h), frames folder, sheet folder, kind, the approved frame 0 or None) for the
+    animation `base` of an art.json project or a WowCube manifest."""
     sys.path.insert(0, str(ART_SCRIPTS))
+    from art import approved_first_frame       # noqa: E402  (the same rule as `art.py budget --video`)
     from art_spec import load_project          # noqa: E402  (cube_art-director's spec reader)
     p = load_project(spec, workspace)
     rx = re.compile(_FRAME_RE.format(base=re.escape(base)))
@@ -113,7 +120,7 @@ def frames_from_spec(spec: Path, base: str, workspace=None):
         frames_dir, sheet_dir = p.workspace / "raw", p.workspace / "video"
     else:
         frames_dir, sheet_dir = p.root / "drawn", p.workspace / "video"
-    return [a.name for _, a in found], sizes.pop(), frames_dir, sheet_dir, p.kind
+    return [a.name for _, a in found], sizes.pop(), frames_dir, sheet_dir, p.kind, approved_first_frame(p, base)
 
 
 # --------------------------------------------------------------------------- decoding
@@ -124,14 +131,21 @@ def tool(name: str) -> str:
     return exe
 
 
-def decode(video: Path, folder: Path, start: float | None, end: float | None) -> list[Path]:
-    """Every frame of the clip (or of start..end seconds) as PNGs in `folder`, in order."""
+def decode_cmd(video: Path, folder: Path, start: float | None, end: float | None) -> list[str]:
+    """The ffmpeg command line: -ss before the input (a fast, accurate seek), the stop as an output duration
+    -t (end - start). `-to` as an input option needs ffmpeg 5.1+; -t works on every version."""
     cmd = [tool("ffmpeg"), "-v", "error", "-y"]
     if start is not None:
         cmd += ["-ss", f"{start}"]
+    cmd += ["-i", str(video)]
     if end is not None:
-        cmd += ["-to", f"{end}"]
-    cmd += ["-i", str(video), str(folder / "f%05d.png")]
+        cmd += ["-t", f"{end - (start or 0.0)}"]
+    return cmd + [str(folder / "f%05d.png")]
+
+
+def decode(video: Path, folder: Path, start: float | None, end: float | None) -> list[Path]:
+    """Every frame of the clip (or of start..end seconds) as PNGs in `folder`, in order."""
+    cmd = decode_cmd(video, folder, start, end)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg could not read {video}: {r.stderr.strip()[-400:]}")
@@ -279,19 +293,43 @@ def _build_sheet():
     return build_sheet
 
 
+def clip_seconds(video: Path, start: float | None, end: float | None) -> float | None:
+    """How long the part of the clip that was cut lasts; None when it is not known (no ffprobe answer and no
+    --end): the preview then uses its default pace."""
+    total = duration(video)
+    stop = end if end is not None else total
+    if stop is None:
+        return None
+    if total is not None:
+        stop = min(stop, total)
+    span = stop - (start or 0.0)
+    return span if span > 0 else None
+
+
 def run(video: Path, names: list[str], size: tuple[int, int], frames_dir: Path, sheet_dir: Path, *, key=None,
         key_range=(40.0, 80.0), ring: int = 1, align: str = "center", supersample: int = 1, loop: bool = True,
         start: float | None = None, end: float | None = None, fps: float | None = None, sheet_name: str,
-        force: bool = False) -> dict:
+        force: bool = False, keep_first: bool | None = None, approved_first: Path | None = None) -> dict:
+    """Cut the clip into `names`. `keep_first`: None = keep an existing first frame (the approved still the video
+    was made from: `approved_first`, else the file in `frames_dir`), True = keep it, False = replace it."""
     targets = [frames_dir / f"{n}.png" for n in names]
-    existing = [t.name for t in targets if t.exists()]
+    first = approved_first if approved_first is not None else (targets[0] if targets[0].exists() else None)
+    keep = (first is not None) if keep_first is None else bool(keep_first)
+    if keep and first is None:
+        raise ValueError(f"--keep-first: there is no {names[0]} to keep (approve the first frame first, or leave "
+                         f"--keep-first out)")
+    if keep and len(names) < 2:
+        raise ValueError(f"{names[0]} is the only frame and it is already approved: nothing for the clip to replace")
+    write = targets[1:] if keep else targets
+    existing = [t.name for t in write if t.exists()]
     if existing and not force:
         raise FileExistsError(f"{frames_dir} already has {', '.join(existing[:4])}"
                               f"{' ...' if len(existing) > 4 else ''}: pass --force to replace them")
     with tempfile.TemporaryDirectory(prefix="v2f_") as td:
         files = decode(video, Path(td), start, end)
         if not files:
-            raise RuntimeError(f"no frames decoded from {video}")
+            raise RuntimeError(f"no frames decoded from {video}"
+                               + (f" (is --start {start} past the end of the clip?)" if start else ""))
         idx = pick_indices(len(files), len(names), loop)
         picked = [files[i] for i in idx]
         closing = files[-1] if loop and len(files) > len(names) else None
@@ -305,27 +343,27 @@ def run(video: Path, names: list[str], size: tuple[int, int], frames_dir: Path, 
     finals = [f if supersample == 1 else f.resize(size, Image.LANCZOS) for f in frames]
     frames_dir.mkdir(parents=True, exist_ok=True)
     for f, t in zip(frames, targets):
-        f.save(t)
+        if t in write:
+            f.save(t)
     seam = seam_report(finals, None if closing_frame is None else
                        (closing_frame if supersample == 1 else closing_frame.resize(size, Image.LANCZOS)))
     # sheet + atlas (art.py sheet's format) and the preview GIF
     sheet_dir.mkdir(parents=True, exist_ok=True)
     base = re.sub(r"_\d+$", "", names[0]) or names[0]
     sheet, atlas = _build_sheet()([(n, f, base) for n, f in zip(names, finals)], None, 2)
-    clip_s = duration(video)
-    if start is not None or end is not None:
-        clip_s = (end if end is not None else (clip_s or 0)) - (start or 0)
+    clip_s = clip_seconds(video, start, end)
     ms = int(round(1000.0 / fps)) if fps else (int(round(clip_s * 1000 / len(names))) if clip_s else 100)
     ms = max(MIN_FRAME_MS, ms)
     atlas["meta"]["image"] = f"{sheet_name}.png"
     atlas["meta"]["video"] = {"source": video.name, "frames_in_clip": total, "picked": idx, "loop": loop,
-                              "frame_ms": ms, **info, **seam}
+                              "frame_ms": ms, "kept_first": str(first) if keep else None, **info, **seam}
     sheet.save(sheet_dir / f"{sheet_name}.png")
     (sheet_dir / f"{sheet_name}.json").write_text(json.dumps(atlas, indent=1), encoding="utf-8")
     gif = [Image.alpha_composite(Image.new("RGBA", f.size, GIF_BG + (255,)), f).convert("RGB")
            .resize((f.width * 2, f.height * 2), Image.NEAREST) for f in finals]
     gif[0].save(sheet_dir / f"{sheet_name}_preview.gif", save_all=True, append_images=gif[1:], duration=ms, loop=0)
-    return {"frames": [str(t) for t in targets], "sheet": str(sheet_dir / f"{sheet_name}.png"),
+    return {"frames": [str(t) for t in write], "kept_first": str(first) if keep else None,
+            "sheet": str(sheet_dir / f"{sheet_name}.png"),
             "atlas": str(sheet_dir / f"{sheet_name}.json"), "gif": str(sheet_dir / f"{sheet_name}_preview.gif"),
             "frame_ms": ms, "picked": idx, "frames_in_clip": total, **info, **seam}
 
@@ -354,6 +392,9 @@ def main(argv=None) -> int:
     ap.add_argument("--end", type=float, default=None, help="seconds into the clip to stop")
     ap.add_argument("--fps", type=float, default=None, help="preview speed (default: the clip's own pace; max 20)")
     ap.add_argument("--force", action="store_true", help="replace frames that already exist")
+    ap.add_argument("--keep-first", action=argparse.BooleanOptionalAction, default=None,
+                    help="keep the approved first frame <name>_00 and write only the others (the default when it "
+                         "exists); --no-keep-first replaces it with the clip's first frame")
     args = ap.parse_args(argv)
 
     video = Path(args.video)
@@ -367,9 +408,14 @@ def main(argv=None) -> int:
     try:
         key = parse_key(args.key)
         key_range = parse_range(args.key_range)
-        kind = None
+        kind, approved_first = None, None
+        if args.start is not None and args.start < 0:
+            raise ValueError(f"--start {args.start}: seconds from the clip's start, 0 or more")
+        if args.end is not None and args.end <= (args.start or 0.0):
+            raise ValueError(f"--end {args.end} must be after --start {args.start or 0}")
         if args.spec:
-            names, size, frames_dir, sheet_dir, kind = frames_from_spec(Path(args.spec), args.name, args.workspace)
+            names, size, frames_dir, sheet_dir, kind, approved_first = frames_from_spec(
+                Path(args.spec), args.name, args.workspace)
             if args.frames is not None and args.frames != len(names):
                 raise ValueError(f"--frames {args.frames}, but the spec has {len(names)} frame(s) of {args.name}: "
                                  f"change the spec first, or leave --frames out")
@@ -382,7 +428,8 @@ def main(argv=None) -> int:
             size, frames_dir, sheet_dir = parse_size(args.size), None, None
         if len(names) < 1 or args.supersample < 1:
             raise ValueError("--frames and --supersample must be at least 1")
-        frames_dir = Path(args.out) if args.out else frames_dir
+        if args.out:
+            frames_dir, approved_first = Path(args.out), None
         sheet_dir = Path(args.sheet_dir) if args.sheet_dir else (sheet_dir or frames_dir)
     except (ValueError, OSError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
@@ -393,7 +440,8 @@ def main(argv=None) -> int:
     try:
         res = run(video, names, tuple(size), frames_dir, sheet_dir, key=key, key_range=key_range, ring=args.ring,
                   align=args.align, supersample=args.supersample, loop=not args.once, start=args.start,
-                  end=args.end, fps=args.fps, sheet_name=args.name, force=args.force)
+                  end=args.end, fps=args.fps, sheet_name=args.name, force=args.force, keep_first=args.keep_first,
+                  approved_first=approved_first)
     except FileNotFoundError as e:
         print(f"ERROR: {e} not found: install ffmpeg (it brings ffprobe) and run again", file=sys.stderr)
         return 3
@@ -406,7 +454,11 @@ def main(argv=None) -> int:
     w, h = size
     print(f"{len(names)} frame(s) {w}x{h} from {res['frames_in_clip']} in the clip (picked {res['picked']}), "
           f"key {res['key']}, crop {res['crop']}")
-    print(f"frames: {frames_dir} ({names[0]} .. {names[-1]})")
+    if res["kept_first"]:
+        print(f"frames: {frames_dir} ({names[1]} .. {names[-1]}); {names[0]} kept: {res['kept_first']} (the approved "
+              f"first frame; --no-keep-first replaces it)")
+    else:
+        print(f"frames: {frames_dir} ({names[0]} .. {names[-1]})")
     print(f"sheet: {res['sheet']}\natlas: {res['atlas']}\npreview: {res['gif']} ({res['frame_ms']} ms per frame)")
     if "seam" in res:
         verdict = "seamless" if res["seam"] <= max(2.0, res["step_median"]) else \
@@ -415,6 +467,9 @@ def main(argv=None) -> int:
     else:
         print(f"no loop seam measured (--once, or the clip has no frame to spare); typical step "
               f"{res['step_median']:.1f}")
+    if "wrap" in res:
+        print(f"loop wrap (last frame back to the first) {res['wrap']:.1f}"
+              + ("" if args.once else " - compare with the typical step: much larger = a visible restart"))
     if kind == "cube-manifest":
         print(f'next: art.py process <manifest> --only {",".join(names)}  (give these frames "fit": "canvas" in '
               f'the manifest to keep the filmed motion), then art.py qa')

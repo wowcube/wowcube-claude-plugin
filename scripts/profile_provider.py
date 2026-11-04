@@ -136,9 +136,17 @@ ANIMATION_ROUTES = ('frames', 'video')
 # guidance -> verification tier. `lite` keeps the quick structure (1-2 prompts, 2 fix rounds) with the full set of
 # checks per prompt; `full` is the thorough tier of a stepwise run (cube_orchestrator RUN_MODES.md).
 GUIDANCE_TIER = {'autonomous': 'lite', 'guided': 'full'}
-# free-text overrides the user may still write ("check everything thoroughly", "quick"). None of them is lighter
-# than `lite`: "quick" names the quick structure, never fewer checks. `standard` only on an explicit request.
-THOROUGHNESS = {'quick': 'lite', 'normal': 'standard', 'thorough': 'full'}
+# free-text overrides the user may still write (PROFILE.md, "Setup answers"): "check everything thoroughly" -> full;
+# an explicit "standard" or "check it more but not every detail" -> standard (the only ways to get it); "quick" /
+# "fast" -> lite. None of them is lighter than `lite`: "quick" names the quick structure, never fewer checks. Words
+# like "normal" are not a route to `standard`: they are refused, and the guidance answer decides.
+THOROUGHNESS = {
+    'quick': 'lite', 'fast': 'lite',
+    'standard': 'standard', 'check more but not every detail': 'standard',
+    'check it more but not every detail': 'standard',
+    'thorough': 'full', 'thoroughly': 'full', 'check everything thoroughly': 'full',
+    'check it thoroughly': 'full',
+}
 TIERS = ('lite', 'standard', 'full')
 _CLOUD_LEAVES = ['prompts', 'reference_images']
 
@@ -155,13 +163,45 @@ def verification_for_guidance(guidance: str | None) -> str:
 
 
 def verification_for(thoroughness: str) -> str:
-    """A free-text checking override ('quick' / 'normal' / 'thorough', or a tier id) -> lite / standard / full."""
-    key = str(thoroughness or '').strip().lower()
+    """A free-text checking override (THOROUGHNESS: "check everything thoroughly", "standard", "check it more but
+    not every detail", "quick", "fast", or a tier id) -> lite / standard / full. Anything else (e.g. "normal")
+    is a ValueError: the guidance answer then decides the tier."""
+    key = ' '.join(str(thoroughness or '').lower().replace(',', ' ').replace('.', ' ').replace('!', ' ').split())
     if key in TIERS:
         return key
     if key not in THOROUGHNESS:
         raise ValueError(f'unknown thoroughness {thoroughness!r}; known: {", ".join(THOROUGHNESS)}')
     return THOROUGHNESS[key]
+
+
+# --------------------------------------------------------------------------- install consent (machine profile)
+# ONE shape, written by install.sh / install.ps1 and wowcube-setup: `"install_consent": {"answer": "yes"|"not_now",
+# "date": "YYYY-MM-DD"}` in ~/.wowcube/config.json. An older plain string ("yes" / "not_now") is still read.
+CONSENT_ANSWERS = ('yes', 'not_now')
+
+
+def install_consent(machine: dict | None = None, *, machine_config: Path | None = None) -> dict:
+    """{'answer': 'yes'|'not_now'|None, 'date': str|None} from the machine profile (a dict, or read from
+    `machine_config` / ~/.wowcube/config.json). Accepts the object shape and the older string shape."""
+    if machine is None:
+        machine = _read_json(Path(machine_config) if machine_config else MACHINE_CONFIG)
+    raw = machine.get('install_consent')
+    answer, date = None, None
+    if isinstance(raw, dict):
+        answer, date = raw.get('answer'), raw.get('date')
+    elif isinstance(raw, str):
+        answer, date = raw, machine.get('install_consent_date')
+    answer = str(answer).strip().lower().replace(' ', '_') if answer is not None else None
+    if answer not in CONSENT_ANSWERS:
+        answer = None
+    return {'answer': answer, 'date': date if isinstance(date, str) and date else None}
+
+
+def consent_record(answer: str, date: str) -> dict:
+    """The one shape setup and the installers write."""
+    if answer not in CONSENT_ANSWERS:
+        raise ValueError(f'unknown install consent {answer!r}; known: {", ".join(CONSENT_ANSWERS)}')
+    return {'answer': answer, 'date': date}
 
 
 def art_routes(have, entry: str = 'new') -> list[str]:

@@ -627,7 +627,7 @@ def derive_font_glyph_metrics(ch: dict, common: dict
     """BMFont char + `common` block -> octBmp_t (PivotX, PivotY, Bw, Bh).
 
     The engine treats a glyph descriptor as font metrics, not as a plain
-    sprite (``oct_scene.h::OCT_label_set``)::
+    sprite (the engine's ``OCT_label_set``)::
 
         cx += zoom * bmp->Bw;                       // pen advance
         cy -= bmp->Bh;                              // newline

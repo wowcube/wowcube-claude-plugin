@@ -27,7 +27,7 @@ Common `game` fields:
 | `packs` | content sets (pack selector) |
 | `panel(root, api)` | your own card in the right column |
 | `onReset(api)` | level reset; also store `api` here |
-| `onPat({ sticker, slot, face, row, col, hud }, api)` | pat; return `true` if handled |
+| `onTap({ sticker, slot, face, row, col, hud }, api)` | a tap on one screen (`face`, `row`, `col`: which one); return `true` if handled. `onPat` is the old name, still accepted |
 | `evaluate(api)` | `{ badge, solved, html }`: status line |
 
 Puzzle: `build(packId, api)` lays content out on stickers, `screen(ctx)` returns a screen's SVG,

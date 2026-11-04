@@ -7,15 +7,17 @@ description: >-
   ALSO the entry point for modding an existing, already-working game ("mod it",
   "swap this sprite", "change the speed", "add a level"), for a balance pass, for
   "undo the last change", for installing a finished game ("put it on my cube", "how do
-  I install it": a store upload and an install QR code), for "is my game done?", and
-  for importing the user's own design document.
+  I install it": an install link and a QR code for the phone), for "is my game done?",
+  and for importing the user's own design document. ALSO the environment-only install
+  ("set up the environment", "install everything", "install the WowCube plugin and
+  everything it needs"): wowcube-setup's Environment-only install, then STOP (no game).
   On first use (no profile) it runs wowcube-setup; "setup" / "reconfigure" too. It
   detects build vs mod and the pipeline stage, and drives every sub-skill and
-  subagent within the profile's budget: guided (stepwise) or autonomous, one stop to
-  approve the art style and the sound list, every build checked by the agent on
-  hidden 24-screen simulator frames, a verified device .oct at the end, sent to
-  WowCube's servers (after one yes) for an install link and QR code the user scans with their
-  phone. Tool-only requests go to wowcube-tools; art-only requests
+  subagent within the profile's budget: guided (stepwise) or autonomous with two
+  planned stops (the style lock, the install-link question at the end), every build
+  checked automatically on all 24 screens, a verified device .oct at the end,
+  sent to WowCube's servers (after one yes) for an install link and QR code the user
+  scans with their phone. Tool-only requests go to wowcube-tools; art-only requests
   (sprites, a sprite sheet, icons, no game code) go to cube_art-director standalone.
 ---
 
@@ -71,6 +73,12 @@ reason to `context/rules.md` and pass the relevant lines into every brief
 
 ### 0. Profile and starting point
 
+**Environment-only install first.** A request only to set up or install ("set up the environment",
+"install everything", "install the WowCube plugin and everything it needs", in any language) goes to
+`wowcube-setup`, "Environment-only install", whatever the profile says: it installs every component with
+no questions (the request is the install consent) and ends with the restart line. Then STOP: no starting
+point, no entry route, no game, nothing else in this session.
+
 Resolve the profile (`wowcube-setup/references/PROFILE.md`, "Resolution"): the request, the context,
 `<ws>/wowcube.project.json`, `~/.wowcube/config.json`, role defaults. No `config.json` or no
 `wowcube.project.json`, or the user says "setup" / "reconfigure" → invoke `wowcube-setup` first (it
@@ -120,8 +128,9 @@ User phrases quoted in this skill are English examples: recognize the same inten
 write every message to the user in the user's language.
 Nothing points to an existing project → Build mode. Delivery-only requests ("put it on my
 cube", "give me the QR code", "build the .oct") go to Stage 5 for the named game; balance requests ("too
-hard", "slower") that only change tunables take the light lane (`references/RUN_MODES.md`, "Light lane"),
-mid-build too; "undo the last change" restores the latest snapshot (`references/RUN_MODES.md`,
+hard", "slower") that only change tunables take the light lane (`references/RUN_MODES.md`, "Light lane":
+one build and one visual check, plus a short playtest in `lite` and `full` when a changed value changes how
+the game plays), mid-build too; "undo the last change" restores the latest snapshot (`references/RUN_MODES.md`,
 "History and undo"). How the user's words map to actions mid-run ("stop, change X" vs "stop and wait", a
 question vs an instruction, a structural change, a pending request): `references/RUN_MODES.md`,
 "Interrupts, questions and changes mid-run".
@@ -130,8 +139,8 @@ question vs an instruction, a structural change, a pending request): `references
 
 | Mode | Activates | In short |
 |---|---|---|
-| **Autonomous** | profile `guidance: autonomous` (the built-in default) | Only the questions the profile left open, then the whole pipeline to the verified device `.oct` within the budget. Stops at the **style lock** (style frame + in-game mock + the sound list: the one creative checkpoint), for real blockers (environment, Codex login) and when the budget is spent. |
-| **Stepwise** | profile `guidance: guided`, or "stepwise", "step by step", "with checkpoints", "review mode", or "stop and wait" mid-run (any language; "stop, change X" is an interrupt that resumes in the same mode) | Every stage boundary, asset batch, prompt and mod change waits for the user's approval. |
+| **Autonomous** | profile `guidance: autonomous` (the built-in default) | Only the questions the profile left open, then the whole pipeline to the verified device `.oct` within the budget. Exactly two planned stops: the **style lock** (style frame + in-game mock, plus the sound list only when real recordings are downloaded, `sound.source: cc0`) and, at the end, the **install-link question** (Stage 5). Otherwise it stops only for a clarifying question when the idea names an existing game, for real blockers (environment, Codex login) and when the budget is spent. No interim install on the cube. |
+| **Stepwise** | profile `guidance: guided`, or "stepwise", "step by step", "with checkpoints", "review mode", or "stop and wait" mid-run (any language; "stop, change X" is an interrupt that resumes in the same mode) | Every stage boundary, asset batch, prompt and mod change waits for the user's approval. No interim install on the cube: the install link comes once, at the end (Stage 5). |
 | **`YOLO` token** | the literal token in the current prompt, then one short risk confirmation (`references/RUN_MODES.md`) | Compat alias of autonomous: no intake questions, the style lock is waived (an independent reviewer approves instead). The confirmation approves neither paid APIs nor downloads. |
 
 One rule decides `run_mode` (written to the context at every entry that starts or resumes work; a
@@ -165,13 +174,21 @@ the device build (CMake, Ninja, `arm-none-eabi-g++`), python with its packages a
 Setup already asked the user once for permission to install these components (`wowcube-setup` Step
 2b, `install_consent` in `~/.wowcube/config.json`); to the user they are "the components for building
 and checking the game" and the simulator is "the automatic checks of every build", never a separate
-concept. *Not now* (or no answer yet): say plainly that without them the game cannot be built or
-checked, and stop until they agree (nothing starts, design included; only *Art only* needs none of them). After the yes the
-installs run (Python and its packages included: `check_env.ps1 -Install` installs Python 3.12 for the
-user and the packages; Linux/macOS: the package line `check_env.sh` printed). Then:
-- **Restart.** Tell the user to close Claude Code and open it again in the same folder (the new programs
-  are found only by a new session), say that everything is saved, and **do not continue until they
-  confirm** they did; then run `check_env` again.
+concept. `install_consent` already `yes` (the one-command installer or an earlier yes) → no question
+again: anything still missing is installed under it. *Not now* (or no answer yet): say plainly that
+without them the game cannot be built or checked, and stop until they agree. **Nothing starts until the
+user agrees to install, design included** (only *Art only* needs none of them). Once they agreed, while
+the installs run or wait for something only the user can do (a package line, an administrator prompt),
+the design and the art may go on; nothing is built before the installs are done and Claude Code was
+restarted. After the yes the installs run (Python and its packages included: `check_env.ps1 -Install`
+installs Python 3.12 for the user and the packages; Linux/macOS: the package line `check_env.sh`
+printed). Then:
+- **Save, then restart.** First everything is saved: both profiles (`wowcube-setup` Step 3) and, when a
+  game is under way, its context. Then tell the user to close Claude Code, open it again in the same folder
+  and start a new session (the new programs are found only by a new session; everything is saved), and
+  **stop this session**: a waiting question cannot span sessions. The next session continues from the saved
+  profile and context: it asks nothing again, runs `check_env` once more and goes on at the first
+  unfinished item.
 - **No admin rights, a declined Windows prompt, or an install that failed** (`[FAILED]` lines): say
   plainly that the game needs these programs on this computer, list exactly what is missing with where
   to get it (the name and the download page or the command, e.g. "Python 3.12: python.org/downloads";
@@ -210,7 +227,7 @@ methodology, no debate about the process — just build the game the prompt desc
 | Infra gate | `app_<game>/` in the dev layout; simulators build; hidden smoke run | `wowcube-boilerplate` | `references/VISUAL_GATE.md` |
 | 3. Assets | style lock; `assets_<game>/art/*.png`; sounds; launcher icon; packed `app_<game>/index.bin`, `art/packed/`, `sound/assets/`, `src/app_<game>_ids.h` | `cube_asset-builder` (art through `cube_art-director` + Codex, sound through `<skills>/scripts/sound_kit.py`), consistency reviewer subagent | `references/STAGE3_ASSETS.md` |
 | 4. Implement | `app_<game>/src/app_<game>.h`, one verified and visually checked prompt at a time | coder / verifier / fixer subagents, visual gate, Playtest Agent | `references/AGENT_BRIEFS.md`, `references/VISUAL_GATE.md`, `SIM_MCP.md` |
-| 5. Deliver | `dist/app_<game>.oct` with verified ARM code; store upload (one yes) → `dist/app_<game>_qr.png` + the install link; `context/<game>_report.md`; video, balance pass on request | `wowcube-boilerplate`, `<skills>/scripts/store_upload.py` | `references/DELIVERY.md` |
+| 5. Deliver | `dist/app_<game>.oct` with verified ARM code; install link + QR code (one yes; the game file goes to WowCube's servers) → `dist/app_<game>_qr.png` + the install link; `context/<game>_report.md`; video, balance pass on request | `wowcube-boilerplate`, `<skills>/scripts/store_upload.py` | `references/DELIVERY.md` |
 
 Stages 1–3, the infra gate and Stage 5 run in the main context through the Skill tool:
 invoke the sub-skill, let it finish, return here. Coders, verifiers, fixers and
@@ -252,9 +269,10 @@ The user cannot see tool runs and subagents; silence looks like a hang. In their
 - **Before** any step that runs tools or subagents for more than a few seconds: one line on what you are
   doing, why, and roughly how long ("Building the game and checking all 24 screens automatically,
   about 2 minutes").
-- **During** a long step (a coder, a review round, an art batch): a short line each time a part finishes
-  ("Part 3 of the game is written, now the code check and the screen check").
 - **After**: one line on the result and what comes next ("All checks passed. Next: the score screen").
+- One line when a step starts and one when it ends, nothing in between. The one exception is a long step
+  made of parts (a long install, an art batch, several prompts): one line per finished part or group is
+  fine ("Part 3 of the game is written, now the code check and the screen check", "Python ready").
 - Failures and retries are said too, plainly ("The code check found a bug in the tap handling; fixing it,
   one more round").
 - Never raw logs, exit codes or file dumps unless asked; never jargon for a `new` user (`experience`).
@@ -352,9 +370,10 @@ smoke run: `wowcube-boilerplate` "Retrying a failed step"). Never run `new_app` 
 it: it refuses an existing folder, and a second scaffold would mint a new `APP_GUID1`.
 
 Never "launch the simulator for a few seconds" to prove anything. Record `infra: "ok"`.
-While the gate waits only for the user's environment fix (toolchain, simulator), run Stage 3
-steps 1–4 (manifest gate, style lock, art, sound: none needs the simulator) and come back for the gate before the
-icon copy and the pack.
+While the gate waits only for the installs the user already agreed to (or for something only the user can
+do: a package line, an administrator prompt), run Stage 3 steps 1–4 (manifest gate, style lock, art,
+sound: none needs the simulator) and come back for the gate before the icon copy and the pack. Before the
+user agreed to install, nothing starts (entry check 3).
 
 ## Stage 3 — Assets
 
@@ -458,8 +477,10 @@ prompt, self-contained instructions. Failures → back to `technical_prompter`.
 4. **Playtest Agent** (`cube_verifier`) on the prompts the tier names (`lite` and `full`: every
    prompt; `standard`: foundation, core and secondary) **and, in `standard`, on any prompt that adds or
    changes an input or a mechanic, whatever its category** (its
-   `### Input or mechanic change` line; `references/RUN_MODES.md`, "Verification tiers"), when the hidden
-   instance's control socket answers (`SIM_MCP.md`): taps, twists, tilts, scored on what it sees. It needs only the
+   `### Input or mechanic change` line; `references/RUN_MODES.md`, "Verification tiers"), through the hidden
+   instance's control socket (`SIM_MCP.md`): taps, twists, tilts, scored on what it sees. A socket that does not
+   answer gets one restart of the instance (by PID); still no answer → an environment blocker (the prompt
+   stays open, `RUN_MODES.md` failure policy 5), never a silent pass on the visual gate alone. It needs only the
    simulator, so start it as soon as the gate run has ended, while the code reviewers are
    still reading (one simulator at a time; stop it by PID afterwards).
 5. **Evaluate.** Pass = every deployed code reviewer ≥ 90, no unresolved critical
@@ -467,7 +488,8 @@ prompt, self-contained instructions. Failures → back to `technical_prompter`.
    critical or major visual finding, Playtest ≥ 90 without a critical issue when
    deployed, and **no open major from any agent**: a 93 with a major (music that never
    stops, art at ±120) is a fix round, not a pass. A major is left open only with a
-   reason recorded in the context (`accepted_majors: [{"finding", "reason"}]`) and
+   reason recorded in the context (`accepted_majors: [{"prompt"?, "asset"?, "finding", "reason"}]`,
+   `references/AGENT_BRIEFS.md`, "Context file") and
    named in the report. Otherwise ONE fixer gets the union of all issues plus the frames that show
    them, then every gate runs again (a fix that satisfies the code reviewers can still
    break the picture). From the second round on the code reviewers re-check against
@@ -528,7 +550,7 @@ Read `references/DELIVERY.md`. In short:
    check with `arm-none-eabi-g++`, so a missing toolchain stopped the run before the infra
    gate (entry check 3), not here.
 2. **Deliver from `dist/` only**, never an `.oct` found anywhere else.
-3. **Store upload and the install QR code**: ask once "Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)",
+3. **The install link and QR code**: ask once "Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)",
    then `python <skills>/scripts/store_upload.py <ws>/dist/app_<game>.oct --yes --verify`:
    the QR code `dist/app_<game>_qr.png` and the link (keep its `?password=` part). Give both with one line:
    "Scan it with your phone (or open the link on it): the WowCube app installs the game on your cube."
@@ -558,8 +580,8 @@ M0 runs **once per game**. Its `import` record in the context marks it done; eve
 3. **Rights.** The profile's `source.rights` (setup asks it as a plain yes/no: "Do you have the right
    to change this game and publish your version?"): `yes` → go on; `no` → stop: modding it needs the
    owner's permission, say so and do nothing to it; `unsure` (or unset and the game is not the user's
-   own) → the mod is made for private testing only (simulator and the user's own cube), never published
-   or shared, and the final report repeats that the owner's permission is needed before publishing.
+   own) → the mod is made for private testing only (the automatic checks and the user's own cube), never
+   published or shared, and the final report repeats that the owner's permission is needed before publishing.
 4. **Update or fork** (the profile's `source.mod`, else ask): *update* works in place, never changes
    `APP_GUID1` or the title, and only bumps the version (the cube replaces the installed game and keeps
    its save); *fork* is a new game in a **new** folder `<ws>/app_<new>/` (a new `<game>` name; never the
@@ -643,7 +665,7 @@ This mode adds no new agents or sub-skills: it reuses `cube_asset-builder` /
 
 | Type | What | Minimal path |
 |---|---|---|
-| **T1 Logic / parameters** | speed, timing, balance numbers, small behaviour | only named values in the tunables block → the light lane (`references/RUN_MODES.md`: edit, build, one visual check; minutes); other small behaviour → one scoped coder task → gates → fixer |
+| **T1 Logic / parameters** | speed, timing, balance numbers, small behaviour | only named values in the tunables block → the light lane (`references/RUN_MODES.md`: edit, build, one visual check, plus a short playtest in `lite` and `full` when a changed value changes how the game plays; minutes); other small behaviour → one scoped coder task → gates → fixer |
 | **T2 Sprite** | replace or add an image | the manifest entry edited or added (below) → `build_pipeline.py validate` (the manifest guard; only the sprites still to draw count against the image budget); the changed sprite goes to `assets_<game>/raw/<name>.png` (never `art/`: `process` writes it), then `art.py process` + `qa` ("Raw images for `process`" below); generated → `cube_art-director` for that sprite only; every new or changed sprite is held to the game's style reference ("Style check" below) → repack → a new `BMP_*` gets one scoped coder edit |
 | **T3 Sound** | replace or add a sound | the user's file, or a CC0 source the user approved → `sound_kit.py build` → repack |
 | **T4 Structural** | new mechanic, new level system or mode, refactor, design change | only when the user explicitly asked (a question like "can we add levels?" is answered, not executed); always the mini-plan approval below, in every mode: first say it starts a new round of work and its estimate, then `cube_game-designer` updates the GDD (what changes for the player, new tunables) and the new parts are planned as prompts; nothing runs before the yes |
@@ -657,7 +679,7 @@ stands in for the GDD when the game has none.
   its exact size, save it as `raw/<name>.png`, and give the entry `"fit": "canvas"` (plus `"alpha": "soft"` when
   `extracted.json` says `semi_transparent`). `process` then scales the canvas 1:1: the result is the PNG as edited.
 - A **new sprite drawn in code** (or a user's PNG): RGBA on a transparent canvas at 4-8x the entry's `size`, same
-  aspect (STAGE3_ASSETS.md §2, procedural step 2); `process` box-downscales it. Without `fit` it crops to the drawn
+  aspect (STAGE3_ASSETS.md §2, procedural step P2); `process` box-downscales it. Without `fit` it crops to the drawn
   object and scales that to fill the frame (centred); with `"fit": "canvas"` the whole canvas is scaled as drawn, so
   a margin or an off-centre placement is kept.
 - Never an exact-size drawing without `"fit": "canvas"`: the default fit crops it to the object and scales it UP to
@@ -729,7 +751,7 @@ a time, never batched.
 ### M6 — Repackage and deliver
 A mod is not done until the device package is rebuilt: Stage 5 (`repack_app.py`: the minor version
 bumped, patch 0, "Versions in Mod mode" above; `dist/app_<game>.oct` carrying exactly that version;
-the store upload with a new QR code, under the consent already given for this game). An older app without `src/app_metadata.h` is
+a new install link and QR code, under the consent already given for this game). An older app without `src/app_metadata.h` is
 built with the fallback builder; moving it to the dev layout is a T4 change (ask first).
 
 ## Configuration
@@ -741,7 +763,7 @@ built with the fallback builder; moving it to the dev layout is a T4 change (ask
 | Verification threshold | 90 | per deployed agent (code reviewers, Playtest); any unresolved critical issue fails regardless of score |
 | Max fix rounds | tier: 2 / 3 / 5 | per prompt or mod change; `budget.fix_rounds` overrides |
 | Visual gate | always, every tier | after every coder and fixer run (`references/VISUAL_GATE.md`) |
-| Playtest Agent | per tier, when the hidden instance's socket answers | ports from 8177 (`playtest_port`); 8077 stays the user's |
+| Playtest Agent | per tier, through the hidden instance's socket (one restart when it does not answer, then an environment blocker) | ports from 8177 (`playtest_port`); never an instance this session did not start |
 | Run mode | from the profile (`guided` = stepwise) | a request overrides it for the run; `YOLO` is the compat alias (`references/RUN_MODES.md`) |
 | Failure policy | bounded | rounds and rescopes are counted; when the budget is spent: save, then ask (guided) or stop with the report (autonomous); every cut in the final report |
 | Art source | from the profile; the procedural style (drawn in code) by default | Codex, own art or a provider only when the user picked it (a detected login or key is never assumed to be theirs); the procedural style when the source cannot draw; a paid image API only on the user's explicit opt-in in this run |

@@ -3,7 +3,7 @@
  *
  * Model: 8 modules (corners), 3 screens each = 24 screens. A twist rotates one half of the
  * cube by 90 degrees; the three screens of a module always move together.
- * Views: CSS-3D cube (drag to orbit/tilt, click = "pat") and a cross-shaped 2D net.
+ * Views: CSS-3D cube (drag to orbit/tilt, click = "tap") and a cross-shaped 2D net.
  *
  * Two kinds of apps plug in via CubeDemo.mount({...}):
  *   - puzzle (default): content lives on modules and moves with twists; the game describes
@@ -928,7 +928,7 @@
 
       const card3d = el('div', 'cv-card');
       const dragHint = this.interactive ? 'drag = tilt the cube' : 'drag to rotate';
-      const h3d = el('div', 'cv-card-h', `<span>3D · ${dragHint} · click = pat</span>`);
+      const h3d = el('div', 'cv-card-h', `<span>3D · ${dragHint} · click = tap</span>`);
       const views = el('div', 'cv-views');
       (g.viewPresets || VIEW_PRESETS).forEach((p) => {
         const b = el('button', '', p.label);
@@ -1298,7 +1298,8 @@
       const s = this.model.stickers[sid];
       const hud = !this.game.screen && !this.game.paint && this.hudAt(s.slot) != null;
       const info = slotInfo(s.slot);
-      const handled = this.game.onPat ? this.game.onPat({ sticker: s, slot: s.slot, ...info, hud }, this.api) : false;
+      const onTap = this.game.onTap || this.game.onPat;        // onPat: the old name, still accepted
+      const handled = onTap ? onTap({ sticker: s, slot: s.slot, ...info, hud }, this.api) : false;
       if (!handled) this.flash(sid, 'pat');
     }
   }

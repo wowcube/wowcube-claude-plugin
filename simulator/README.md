@@ -1,10 +1,10 @@
 # WowCube standalone simulator
 
-The OctaviOS simulator (engine octavios dev `609d5ae`), built **once**, without a game, that loads any game at runtime
-as a plugin. This plugin carries it **prebuilt** for every OS (`simulator/dist`); its sources are private
-(wowcube/OCT_cube-sim-sources) and are not part of the plugin. Games compile against the public game API
-(`api/`, `api/README.md`), which comes from the same commit of those sources (`api/SOURCE`). No octavios or telemetry
-checkout, no compiler for the simulator and no download are needed.
+The WowCube simulator, built **once**, without a game, that loads any game at runtime as a plugin. It is the
+pipeline's automatic checker: agents run it hidden and muted to look at all 24 screens and to play a game before the
+user does; users play on their cube. This plugin carries it **prebuilt** for every OS (`simulator/dist`); its sources
+are not part of the plugin. Games compile against the public game API (`api/`, `api/README.md`), which matches the
+same engine version (`api/SOURCE`). No other checkout, no compiler for the simulator and no download are needed.
 
 ```
 wowcube-sim --game <app_dir> [--headless] [--mute] [--frames <dir> --every-ms N] [--seconds S] [--mcp-port N] ...
@@ -18,50 +18,33 @@ wowcube-sim --game <app_dir> [--headless] [--mute] [--frames <dir> --every-ms N]
 
 The installed binaries are machine state (an installed plugin folder may be read-only or replaced on an update):
 `get_sim.*` installs them from `simulator/dist` into `~/.wowcube/sim/<version>/<os>/` (`<version>` = `sim_version` in
-`api/SOURCE`; `$WOWCUBE_SIM_DIR` overrides the whole folder). Every tool (`run_hidden`, `run_upload`, `check_env`,
-`new_app`, `build_device`) runs that one exe and nothing else (CI points `WOWCUBE_SIM_DIR` at its own folder), and
-only when its `--version` names exactly that version: a stale build (an older version that still answers
-`--version`) is reported as not installed, with the `get_sim` command (`check_env`: `[MISSING]`, exit 2;
-`run_hidden`, `run_upload`, `new_app`: refused). Resolver and check: `tools/sim/sim_path.ps1` (`Resolve-SimExe`,
+`api/SOURCE`; `$WOWCUBE_SIM_DIR` overrides the whole folder). Every tool (`run_hidden`, `check_env`, `new_app`,
+`build_device`) runs that one exe and nothing else, and only when its `--version` names exactly that version: a stale
+build (an older version that still answers `--version`) is reported as not installed, with the `get_sim` command
+(`check_env`: `[MISSING]`, exit 2; `run_hidden`, `new_app`: refused). Resolver and check: `tools/sim/sim_path.ps1` (`Resolve-SimExe`,
 `Test-SimExe`) / `sim_path.sh` (`sim_exe`, `sim_check`). An explicit `-Exe` / `--exe` skips the check.
 
 ## Get it (prebuilt, inside the plugin)
 
 ```
-simulator/dist/<version>/manifest.txt                              version, sources repository + commit, sha256 + size
+simulator/dist/<version>/manifest.txt                              version, build id, sha256 + size of every file
 simulator/dist/<version>/windows/wowcube-sim.exe                   MSVC /MT, no runtime DLLs
-simulator/dist/<version>/linux/wowcube-sim-linux.tar.gz            wowcube-sim + libSDL3.so.0 + spptest (Ubuntu 22.04)
+simulator/dist/<version>/linux/wowcube-sim-linux.tar.gz            wowcube-sim and its libraries (Ubuntu 22.04)
 simulator/dist/<version>/macos-arm64/wowcube-sim-macos-arm64.tar.gz    wowcube-sim + libSDL3.0.dylib
 simulator/dist/<version>/macos-x86_64/wowcube-sim-macos-x86_64.tar.gz  (the same, Intel)
 ```
 
-These are the CI artifacts of the sources repository (`wowcube-sim-<os>`) exactly as CI uploaded them; the Linux and
-macOS builds stay archives (they keep the exec bit, and the macOS exe is about 107 MB unpacked, mostly zeros).
+These are the release builds (`wowcube-sim-<os>`), unchanged; the Linux and macOS builds stay archives (they keep the
+exec bit, and the macOS exe is about 107 MB unpacked, mostly zeros).
 
 `tools\sim\get_sim.ps1` (Windows) / `tools/sim/get_sim.sh` (Linux, macOS; the Mac's build by `uname -m`) install it
 into `~/.wowcube/sim/<version>/<os>/` (copied, not run in place: the plugin folder may be read-only). The rule: the
 manifest's version is the one `api/SOURCE` names, the file's sha256 matches the manifest, and a staged copy answers
-`--version` (hidden on Windows) with that version and the manifest's build commit; only then does it replace the
+`--version` (hidden on Windows) with that version and the manifest's build id; only then does it replace the
 installed exe. There is no fallback: the plugin ships no simulator sources, so a missing or damaged prebuilt
 simulator means an incomplete plugin (reinstall or update it).
-The Linux build still needs the system's OpenGL (`libopengl0`), EGL, X11 or Wayland, BlueZ (`libbluetooth3`) and
-libsystemd; the macOS one carries `libSDL3.0.dylib` (`@executable_path`, ad-hoc signed).
-
-**Maintainers: the simulator and the public game API come from one commit of the sources.** `tests/test_sim_dist.py`
-fails when `simulator/dist/<version>/manifest.txt` names another commit or version than `api/SOURCE` (or a file's
-sha256 is off), and the plugin's CI (`.github/workflows/game.yml`) starts each OS's binary, builds the template game
-against `api/` with it and runs it headless. After the sources repository's CI is green for a commit:
-
-```
-python tools/sim/stage_dist.py --from-ci --sources <checkout>   # gh logged in: the CI build of the checkout's HEAD:
-                                                                # downloads, checks, stages, writes the manifest
-python tools/api/gen_api.py --sources <checkout>                # the public game API from the same commit
-python tools/sim/stage_dist.py --check [--run]                  # what the test and CI run
-```
-
-`stage_dist.py` checks each archive's layout and the build commit inside each exe, runs `--version` of the binary this
-machine can start and removes other versions' folders (the plugin carries one build: about 13 MB). Then commit
-`simulator/dist` and `api/`. Only these maintainer scripts use GitHub or the sources.
+The Linux build still needs the system's OpenGL (`libopengl0`), EGL, X11 or Wayland and the system libraries
+`check_env.sh` lists; the macOS one carries `libSDL3.0.dylib` (`@executable_path`, ad-hoc signed).
 
 ## Build a game for it
 
@@ -85,18 +68,18 @@ Test hooks: `-Define` / `-D`: `#define NAME ...` lines are rewritten in a
 snapshot of `src/` (`out/sim/obj/src`), so guarded and unguarded hooks are both overridden; a NAME no source defines
 becomes a compiler `-D`. A typical check build: `-Define <GAME>_DEBUG_AUTOPLAY=1,<GAME>_MUTE=1`.
 
-**Tap indicator (off).** octavios dev/test firmware paints the struck screen white for 100 ms after every applied tap
-(`OCT_DEBUG_TAP_FLASH`, a debug aid; release firmware, branch `main`, has none). The prebuilt simulator leaves it out,
-so a frame captured right after a tap shows the game's own answer, as on a cube with release firmware (measured
-2026-11-03: in a tap-flash build the struck screen is white from ~80 to ~180 ms after the MCP tap's reply, in the
-default build never). `--version` of a tap-flash build ends in `, tap flash`.
+**Tap indicator (off).** Development cube firmware paints the struck screen white for 100 ms after every applied tap
+(a debug aid; release firmware has none). The prebuilt simulator leaves it out, so a frame captured right after a tap
+shows the game's own answer, as on a cube with release firmware (measured 2026-11-03: in a tap-flash build the struck
+screen is white from ~80 to ~180 ms after the MCP tap's reply, in the default build never). `--version` of a
+tap-flash build ends in `, tap flash`.
 
 ## Run flags
 
 | Flag | Meaning |
 |---|---|
 | `--game <app_dir>` | load the game (also env `WOWCUBE_SIM_GAME`). Without it: the blank simulator (the built-in shell) |
-| `--headless` | the window is never shown and the loop runs without activation (Windows: `WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE`, input and global key state ignored, no file dialogs or message boxes, crash/assert/abort dialogs suppressed: exit 99 + `headless_crash.txt`, no Bluetooth auto-connect, no settings written, no single-instance mutex; Linux/macOS: `SDL_WINDOW_HIDDEN`, no Bluetooth reconnect, no settings written). Implies `--mute` |
+| `--headless` | the window is never shown and the loop runs without activation (Windows: `WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE`, input and global key state ignored, no file dialogs or message boxes, crash/assert/abort dialogs suppressed: exit 99 + `headless_crash.txt`, no device auto-connect, no settings written, no single-instance mutex; Linux/macOS: `SDL_WINDOW_HIDDEN`, no device reconnect, no settings written). Implies `--mute` |
 | `--mute` | no audio device is opened; the mixer still runs into a modelled ~200 ms playback queue (SDL's limit) drained at the real rate, a stall being an underrun that is never caught up later, so voices end when they would on the cube and `SND_play` keeps accepting (sound starts are logged for MCP `record`) |
 | `--frames <dir>` | PNG of all 24 screens as an unfolded cross (TOP above FRONT; LEFT FRONT RIGHT BACK; BOTTOM) every `--every-ms` (default 500), `frame_<index>_<ms>.png` |
 | `--every-ms <n>` | frame period in ms (needs `--frames`). A `--seconds S` run owes `ceil(S*1000 / n)` frames |
@@ -112,9 +95,8 @@ default build never). `--version` of a tap-flash build ends in `, tap flash`.
 The simulator boots like a cube: ~3 s of the engine's eyes intro on the face that is up, then the game. Judge the
 last frames of a run of 15 s or more.
 
-Nothing is written into `<app_dir>` by a run: the pack is built in memory (a baked-in build still writes the `.oct`
-next to its app, as upstream). The device `.oct` is built by `scripts/build_device.*` (ARM module from `api/apps` +
-`api/include`, no octavios needed).
+Nothing is written into `<app_dir>` by a run: the pack is built in memory. The device `.oct` is built by
+`scripts/build_device.*` (ARM module from `api/apps` + `api/include`, nothing else needed).
 
 Start errors print to stderr, go to `log_1.txt` and `<workdir>/sim_error.txt`, and exit with: `10` bad arguments,
 `11` app folder missing or without exactly one `.target`, `12` plugin missing or not loadable, `13` ABI mismatch
@@ -141,22 +123,31 @@ written and exactly `ceil(Seconds*1000 / EveryMs)`; each run gets a fresh `-OutD
 earlier run's saves. Below 250 ms per frame a desktop loses a slot or two during the boot intro (exit 10): use `-AllowDrops`
 for motion and video captures.
 `tools/sim/run_hidden.sh` applies the same rules on Linux (Xvfb) and macOS. `<OutDir>\run_info.json` (both wrappers, written at the start) holds pid, start time, `ends_at` and the MCP port:
-an MCP session (a playtest) is `-Seconds 1500 -EveryMs 0 -AllowEarlyStop` (a lifetime longer than the 10-20 min a playtest takes; it is stopped early anyway), driven with `tools\sim\mcp.ps1 -Port <port> ...` and
-ended with `tools\sim\stop.ps1 -RunInfo <OutDir>\run_info.json` (stops that PID only if it is still the same exe).
+an MCP session (a playtest) is `-Seconds 1500 -EveryMs 0 -AllowEarlyStop` (`run_hidden.sh --seconds 1500 --every-ms 0
+--allow-early-stop`; a lifetime longer than the 10-20 min a playtest takes; it is stopped early anyway), driven with
+`tools\sim\mcp.ps1 -Port <port> ...` and ended with `tools\sim\stop.ps1 -RunInfo <OutDir>\run_info.json` (Linux/macOS:
+`tools/sim/stop.sh <OutDir>/run_info.json`). Both stop that PID (on Linux its process group) only while it still runs
+the same exe; without `-AllowEarlyStop` / `--allow-early-stop` a stopped run is exit 7, and `-Seconds 0` /
+`--seconds 0` (until stopped) requires it.
 
-**Battery-save keep-alive.** After 60 s with no tap, twist or sustained movement (`OCT_BATSAVE_IDLE_MS`; a game's own
-autoplay is none of them) the engine enters battery save: the cube dims and a game shows a "PAUSED" toast and stops.
-So both wrappers start `tools/sim/keepalive.py` for a run longer than 50 s (or `-Seconds 0`) once the MCP port is
-known: every 25 s (`-KeepAliveSec` / `--keepalive-sec`) it spins the cube 1080 deg about the vertical axis with 36
-`turn 30 0 0`, one a frame (~0.6 s). The simulator feeds each frame's rotation to the gyro spread over that frame, so
-that is ~1800 deg/s for longer than the 300 ms the engine's sustained-movement detector needs (smoothed gyro L1 above
-625 deg/s, `oct_gesture_core.h`); the idle clock restarts. Yaw is about the world vertical, so gravity in cube space
+**Battery-save keep-alive.** After 60 s with no tap, twist or sustained movement (a game's own autoplay is none of
+them) the engine enters battery save: the cube dims and a game shows a "PAUSED" toast and stops. So both wrappers
+start `tools/sim/keepalive.py` for a run longer than 50 s (or `-Seconds 0`) once the MCP port is known: every 25 s
+(`-KeepAliveSec` / `--keepalive-sec`) it spins the cube 1080 deg about the vertical axis with 36 `turn 30 0 0`, one a
+frame (~0.6 s). The simulator feeds each frame's rotation to the gyro spread over that frame, so that is ~1800 deg/s
+for longer than the 300 ms the engine's sustained-movement detector needs (smoothed gyro rate above about 625 deg/s);
+the idle clock restarts. A pulse never lasts less than 0.4 s: when the replies come faster, the turns are paced (the
+log says so). Yaw is about the world vertical, so gravity in cube space
 (tilt) never changes, and three whole turns bring the pose back. Measured with a 24-screen game, 100 s at 1 s frames:
 without it battery save came on at 61.5 s (frames dim from 38.0 to 31.8 mean, "PAUSED" on every face); with it, none
 in 100 s; one pulse at ~21 s alone moved battery save from 60.8 s to 82.1 s; MCP `record` showed gravity
 (0, -1, 0) in every frame during a pulse while the yaw ran through 360 deg three times. Pulses are logged in
-`<OutDir>/keepalive.log`; `run_info.json` says `keepalive: true`. A tap sent during a pulse may be dropped
-("rotating the cube is not tapping it"): send it again. `-NoKeepAlive` / `--no-keepalive` only to test battery save.
+`<OutDir>/keepalive.log` with their start time and length. A failed pulse (a turn not answered `ok`, no reply within
+10 s, a dropped connection) is logged as a WARNING (ERROR from the third in a row) and retried after 1, 2, 4 ... s on a
+fresh connection; the keep-alive ends only with the run. `run_info.json` says `"keepalive": "starting"` until the first
+complete pulse, then `true`; `"failing"` (three or more failures in a row) or `"failed"` (never reached the simulator)
+means battery save is not held off: read the log. A tap sent during a pulse may be dropped ("rotating the cube is not
+tapping it"): send it again. `-NoKeepAlive` / `--no-keepalive` only to test battery save.
 
 ### What the frame dump draws
 
@@ -165,19 +156,12 @@ filtering) into a cross on a `#282828` (40, 40, 40) background: 4 px gaps betwee
 between faces, the empty corners of the cross. Those grey lines are the dump's, not the game's (the cube's bezels are
 not drawn). Inside a screen everything is the engine's own output: it renders into a 120×120 back buffer and doubles
 it to 240×240 (edges step in 2 px), and the doubling takes each pixel pair's red from the previous back-buffer pixel
-(`oct_render.h`, "Upscale backbuffer, shift red"; the same engine code runs on the cube). So red sits 2 px off green
+(the engine's own output stage; the same code runs on the cube). So red sits 2 px off green
 and blue along the screen's own rows: a bright shape on a darker colour gets a 2 px pink line on one side and a 2 px
 cyan one on the other (measured on a QA frame's teal arrow disc: the white stem's G/B at x 598-629, its R at 596-627,
 while the source sprite's edge is clean), horizontal on some screens of the cross and vertical on others (screen
 rotation). Every app shows it, the template too: not a defect. A defect is a fringe that is also in the source sprite, one in a key colour, wider than 2 px or
 all round a shape, or a line of the game's background colour along the inner screen edges (`tools/sim/seams.py`).
-
-### Upload mode (Windows)
-
-`wowcube-sim --upload <file.oct> --mac <AA:BB:CC:DD:EE:FF> [--upload-name <label>] [--connect-sec N] [--dry-run]`
-uploads one `.oct` to one paired cube over Bluetooth SPP and exits; always headless, no game, no MCP socket.
-Wrapper, exit codes and status: `tools/cube_upload/README.md`. Linux: `~/.wowcube/sim/<version>/linux/spptest` (the
-command-line uploader the prebuilt Linux simulator ships next to `wowcube-sim`).
 
 ### Linux / macOS headless
 
@@ -219,11 +203,11 @@ the log line `imports before constructors: yes` confirms it.
 
 The simulator refuses a plugin whose magic, versions, layout or app name differ (exit 13), fills its import table
 with the same list of engine functions the cube's binder uses,
-builds the pack from `<app_dir>` with the plugin's metadata, and binds the callbacks per module through
-`OctSimBindLinkedApp` when the engine starts the app (`OctAppTesting = 1`), exactly as for a baked-in app.
+builds the pack from `<app_dir>` with the plugin's metadata, and binds the callbacks per module when the engine starts
+the app, as the cube does.
 
-Differences to the baked-in simulator: the game sees the module view of the engine (as on the cube) instead of the
-whole engine; the libc stand-ins of `oct_freestanding.h` apply (device `sinf`/`cosf` approximations, `snprintf` =
+What the plugin model means for a game: it sees the module view of the engine (as on the cube), not the whole
+engine; the libc stand-ins of `oct_freestanding.h` apply (device `sinf`/`cosf` approximations, `snprintf` =
 `OCT_snprintf`), except `memset`/`memcpy`/`memcmp`/`sqrtf`, which come from the host; an app's `WLOG_*` telemetry is
 compiled out (`APP_TELEMETRY` is not defined; the import slots are `NULL`). The engine's own records still reach the log.
 
@@ -236,8 +220,8 @@ unsuffixed floating literal (`file:line`, fix: add `f`), comments and strings ig
 `-AllowDoubleLiterals` / `--allow-double-literals` (then its simulator floats may differ from the cube). The gate for
 everything else is the **device check** `build_game.*` runs next: the source snapshot compiled with
 `arm-none-eabi-g++` and the cube's exact flags (`-Werror`, syntax only), so a game that would not build for the cube
-fails before any simulator run. `-NoDeviceCheck` / `--no-device-check` skips it (CI does on Windows/macOS, which have
-no ARM toolchain; Linux CI runs it).
+fails before any simulator run. `-NoDeviceCheck` / `--no-device-check` skips it (only on a machine without the ARM
+toolchain).
 
 Captures (`--frames`, MCP `screens`, `record`) copy the 24 framebuffers and the topology under one lock that the modules' display DMA and module 0's topology publish also take: no torn
 screen. The lock alone does not make pixels and topology agree during a twist (module 0 may publish the new topology
@@ -246,26 +230,3 @@ topology its module drew under and the publish tags the topology: a `--frames` s
 a period) and MCP `screens` up to 100 ms for all 24 tags to match; a frame taken without it is counted `skewed`
 (summary `skewed`, `skewed_slots`). `record` samples on its period and does not wait. Screens of different modules may come from different engine
 ticks (the modules are not in lockstep), as on the cube.
-
-## What was verified (2026-11-02, re-checked 2026-11-03)
-
-| | Windows 11 (local) | Linux (GitHub `ubuntu-22.04`, CI) | macOS (GitHub `macos-latest` arm64 and `macos-15-intel` x86_64, CI) |
-|---|---|---|---|
-| simulator builds | yes (MSVC 2022, Release) | yes (g++, SDL3 3.4.16 from source, BlueZ) | yes (Apple clang, Homebrew SDL3) |
-| template plugin builds | yes (clang-cl) | yes (g++) | yes (Apple clang) |
-| template headless run (15 s) | yes: never visible (watchdog `max_visible=0`), muted, Demo 0 as expected; **pixel-identical** to the former patched `tools/sim_headless` build for the same app | yes, under Xvfb: 15/15 frames, `check_template_frame.py` MATCH | yes (hidden window, Apple software GL 4.1): 15/15 frames, MATCH |
-| a full game (autoplay) | yes: 20 s headless, the game plays (timer, kills, enemies, player); same picture as the former `tools/sim_headless` up to gameplay randomness | - | - |
-| MCP | `ping`, `info` (folder + title), `screens faces`, `twist`, `idle` answered | socket starts (log) | socket starts (log) |
-| start errors | exit 10/11/12/13/14/15 with `sim_error.txt`, never visible; a struct-layout change (`-Zp1`) is refused (13); unwritable `--frames` -> 15; `--fresh-saves` with a locked card image -> 10, an `e1_backup.raw` is kept | exit 10, 11, 15 asserted | - |
-| `--mute` mixer (2026-11-03) | a test game playing a sound every 0.5 s: module 0 accepted 44 of 44 `SND_play` (6 voices), MCP `record` meta lists a `snd` start on module 0 every 500 ms | - | - |
-| constructors (2026-11-03) | a non-`TL` global initialized with `OCT_random(5, 5)` reads 5; log `imports before constructors: yes` | - | - |
-| device check (2026-11-03) | template and a full game pass; a `double` in the game fails the build before compiling the plugin | runs in CI | skipped (no ARM toolchain) |
-| strict runs (2026-11-03) | reused `-OutDir` with frames refused (exit 1); summary checked for run id, `completed=1`, `ok=1`, duration, frame count | `run_hidden.sh` in CI | `run_hidden.sh` in CI |
-| re-review fixes (2026-11-03) | template 15 s: 15/15 frames, every PNG decoded, `expected=15`, Demo 0 as expected; a full game 20 s every 500 ms: 40/40, `skewed=0`, the game plays; MCP `ping`, `info`, `twist`, `idle`, `screens faces` after the twist; an unsuffixed literal fails `build_game`, `-AllowDoubleLiterals` builds it | `run_hidden.sh` in CI | `run_hidden.sh` in CI |
-| exe size | 6 MB (was 111 MB: the 100 MB upload buffer was emitted as initialized data) | - | - |
-| baked-in build (`build_sim -BakeApp`, sources repository) | builds and runs headless; frame identical to the plugin run | - | - |
-
-The Windows CI runner has no OpenGL 3.3 driver (`wglCreateContextAttribsARB missing`): the simulator and the plugin
-build there, the run ends at GL init with exit 99 and no dialog; CI skips that step only when the log names
-`wglCreateContextAttribsARB missing`, any other failure fails the job. Linux/macOS `--headless`
-was only run on CI; a visible run with real audio was not tried anywhere (agents never start one).

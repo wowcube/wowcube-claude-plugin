@@ -21,7 +21,7 @@ Playtest Agent **drives** the hidden simulator and scores what it sees. Each ret
 | **Requirements Agent** | code, GDD, prompt | completeness 45, gdd_alignment 25, no_regressions 20, verification_criteria 10 | every prompt, every tier |
 | **Template Agent** | code against `app_ai_template.h` + `API.md` | api_correctness 40, platform_constraints 30, code_quality 30 | every prompt, every tier |
 | **Screen Review** | the 24-screen PNG dump of a hidden run | PASS / FAIL with findings (no critical or major) | every prompt and every fix, **in every run mode, with or without MCP** |
-| **Playtest Agent** | the running hidden simulator | visual_correctness 40, interaction 35, stability 25 | the prompts the tier names (`lite` and `full`: every prompt; `standard`: mechanic prompts), when the hidden instance's control socket answers |
+| **Playtest Agent** | the running hidden simulator | visual_correctness 40, interaction 35, stability 25 | the prompts the tier names (`lite` and `full`: every prompt; `standard`: foundation, core and secondary, plus any prompt that adds or changes an input or a mechanic), through the hidden instance's control socket (no answer: one restart, then an environment blocker, never a silent pass) |
 
 The tier (`lite` / `standard` / `full`) comes from the user's profile through the orchestrator
 (`cube_orchestrator/references/RUN_MODES.md`, "Verification tiers"); the Screen Review is never
@@ -442,9 +442,11 @@ colour (magenta/green), one wider than 2 px or all round a shape (V5); a thin li
 background colour along inner screen edges (the `seams:` line; V1).
 
 **PAUSED / dimmed in a hidden run is not expected:** `run_hidden` keeps runs over 50 s out of battery save
-(the engine's 60 s idle pause) with a keep-alive (`<out>/keepalive.log`; `run_info.json` `keepalive: true`).
-A "PAUSED" toast or a dimmed cube then means the keep-alive did not run (python missing, `-NoKeepAlive`, its
-log): rerun; it is a game finding only when the game pauses itself.
+(the engine's 60 s idle pause) with a keep-alive. `run_info.json` says `"keepalive": "starting"` until its first
+complete pulse (about 25 s in), then `true`; `"failing"`, `"failed"` or `false` means battery save is not held
+off, and `<out>/keepalive.log` says why (a WARNING / ERROR line per failed pulse). A "PAUSED" toast or a dimmed
+cube with anything but `true` there (or no pulse logged before the pause: python missing, `-NoKeepAlive`) is the
+keep-alive's fault: rerun; it is a game finding only when the game pauses itself while the log shows pulses.
 
 ### Prompt Template (fresh reviewer)
 
@@ -458,9 +460,9 @@ hidden simulator run. You only read files; you start nothing.
 <insert Verification Task JSON, including "frames_dir">
 
 ## Rules
-1. List frames_dir; open the first frame in which no screen still shows the boot intro
-   (the eyes on the up face, near-black screens; about 4.5 s on a desktop, later on a slow machine),
-   one from the middle and the last (Read tool), more when motion matters
+1. List frames_dir; open the first frame from about 8 s on in which no screen still shows the boot
+   intro (the eyes on the up face, near-black screens; later on a slow machine), one from the middle
+   and the last (Read tool), more when motion matters
 2. Read the GDD's screen map and this prompt's verification_criteria
 3. Check V1-V9 of the cube_verifier Screen Review table on every face
 4. Every finding names the frame path, the face/screen and what is wrong
@@ -490,12 +492,15 @@ Return ONLY this JSON:
 
 ## Playtest Agent
 
-Deployed when the hidden instance's control socket answers (`sim_mcp` = `wire`,
-`cube_orchestrator/SIM_MCP.md`). It **launches nothing**: the orchestrator builds a
+Deployed on the prompts the tier names, through the hidden instance's control socket (`sim_mcp` = `wire`,
+`cube_orchestrator/SIM_MCP.md`). A socket that does not answer is not a reason to skip it: the orchestrator
+stops that instance by PID and starts a fresh one once; still no answer → an environment blocker (the
+prompt stays open, `cube_orchestrator/references/RUN_MODES.md`, "Verification tiers"), never a silent pass
+on the Screen Review alone. It **launches nothing**: the orchestrator builds a
 playtest plugin (`tools/sim/build_game.*` with autoplay off, playfield pin -1, still muted:
 the agent's taps, twists and tilts are the only input), starts the bundled simulator hidden
 with `tools/sim/run_hidden.ps1 ... -Seconds <playtest_seconds> -EveryMs 0 -McpPort 8177 -AllowEarlyStop`
-(Linux/macOS `tools/sim/run_hidden.sh ... --seconds <playtest_seconds> --every-ms 0 --mcp-port 8177`; window
+(Linux/macOS `tools/sim/run_hidden.sh ... --seconds <playtest_seconds> --every-ms 0 --mcp-port 8177 --allow-early-stop`; window
 never shown, no audio device; `playtest_seconds` from the context, default 1500: real playtests took 10-20 min,
 the old 300 s lifetime ended instances mid-playtest), checks `ping`, and hands over
 `playtest_port`, `frames_dir` and `ends_at` (from `run_info.json`: when the instance closes itself)
@@ -504,7 +509,8 @@ instance on the first one's work dir (`run_hidden -WorkDir <first OutDir>\work`,
 with a new `-OutDir` starts with empty saves. The orchestrator starts both; the agent reports which run it
 judged. The agent
 connects, drives the game and scores **what it sees**; the orchestrator stops the instance
-by its PID afterwards.
+by its PID afterwards (`tools/sim/stop.ps1 -RunInfo <OutDir>\run_info.json`; Linux/macOS
+`tools/sim/stop.sh <OutDir>/run_info.json`), so it never blocks for its whole lifetime.
 
 Read `cube_orchestrator/SIM_MCP.md` before the first command: observation script, aiming,
 the camera-vs-cube distinction, what a playtest can and cannot judge. Two rules decide
@@ -536,8 +542,8 @@ aiming a tap. Commands go through
    `cube` poses for gravity games; after each action `idle`, `sleep 150` (mcp.ps1's own
    pause), then `screens faces`: a capture sent right after `ok twist` still shows the
    pre-twist picture. A tap's reply comes after its strike and the cube's verdict (it can
-   take ~0.6 s: the spacing below), and the bundled simulator shows no white tap flash (dev
-   firmware's `OCT_DEBUG_TAP_FLASH` is off, SIM_MCP.md "Captures after a tap"), so the
+   take ~0.6 s: the spacing below), and the bundled simulator shows no white tap flash (development
+   firmware's tap indicator is off in it, SIM_MCP.md "Captures after a tap"), so the
    capture shows the game's own answer. Only a simulator whose version line ends in
    `, tap flash` paints the struck screen white from ~80 to ~180 ms after the tap's reply
    (where `sleep 150` lands): there wait `sleep 300`, and a screen fully white in one capture right after a tap is that indicator,
@@ -626,7 +632,10 @@ it through its control socket and score what you see.
    2 bottom-left, 3 bottom-right). Its reply says where the tap went: only
    `match 1 delivered 1` reached the game's on_tap on that screen; `match 0`, `err tap_dropped`
    or `err tap_unconfirmed` = the tap never arrived (retry once, then note it, no deduction).
-   `tap_dropped` = the cube's leader decided it was no tap (too few modules' rows agreed);
+   `tap_dropped` = the cube's leader decided it was no tap (too few modules' rows agreed), most
+   often because the tap landed inside a keep-alive pulse (the cube is spun for ~0.6 s every 25 s,
+   and a cube being turned is not tapped): send it again; `<out>/keepalive.log` lists every
+   pulse with its start time and length, so you can match the dropped tap to one;
    `tap_unconfirmed` = it decided nothing for that click (rows absorbed into a tap struck within
    50 ms before it, a twist opening or settling, or modules not running); neither means the game
    is broken. Send taps back to back, no `sleep`: each `tap` waits until 600 ms after the previous

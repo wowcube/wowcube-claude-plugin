@@ -54,7 +54,7 @@ else miss "C++ compiler (game plugin)" "see the install line below (g++ or clang
 # --- simulator --------------------------------------------------------------------------------------
 . "$REPO_ROOT/tools/sim/sim_path.sh"
 SIM="$(sim_exe)"
-# the plugin carries the prebuilt simulator (simulator/dist/<version>, tools/sim/stage_dist.py): get_sim installs it
+# the plugin carries the prebuilt simulator (simulator/dist/<version>): get_sim installs it
 dist_ready=0
 [ -f "$REPO_ROOT/simulator/dist/$(sim_version)/manifest.txt" ] && dist_ready=1
 # OK only for the version this plugin needs (api/SOURCE): a stale build answers --version too

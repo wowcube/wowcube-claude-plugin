@@ -73,7 +73,7 @@ $msvcOk = [bool]$vsPath
 # --- simulator ------------------------------------------------------------------------------
 . (Join-Path $repo 'tools\sim\sim_path.ps1')
 $simExe = Resolve-SimExe
-# the plugin carries the prebuilt simulator (simulator\dist\<version>, tools\sim\stage_dist.py): get_sim installs it
+# the plugin carries the prebuilt simulator (simulator\dist\<version>): get_sim installs it
 $distReady = Test-Path -LiteralPath (Join-Path $repo "simulator\dist\$(Get-SimVersion)\manifest.txt")
 # OK only for the version this plugin needs (api\SOURCE): a stale build answers --version too
 $sim = Test-SimExe $simExe

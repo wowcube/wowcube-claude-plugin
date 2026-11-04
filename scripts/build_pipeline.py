@@ -756,7 +756,7 @@ def do_pack(args: argparse.Namespace) -> int:
                     shutil.move(str(p), str(unused / p.name))
                 print(f"WARNING: moved {len(extra_mp3)} mp3(s) not in the manifest out of {snd_assets} -> "
                       f"{unused} (they would ship): {', '.join(p.stem for p in extra_mp3)}", file=sys.stderr)
-        # beta (octavios dev) container: index.bin + art/packed + kind-aware
+        # beta container: index.bin + art/packed + kind-aware
         # src/app_<game>_ids.h, emitted into the app dir by pack.py
         pack_cmd += [
             "--beta-app-dir", str(app_dir),

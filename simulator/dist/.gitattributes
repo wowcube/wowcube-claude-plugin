@@ -1,4 +1,4 @@
-# prebuilt simulator binaries and archives (tools/sim/stage_dist.py): stored byte for byte
+# prebuilt simulator binaries and archives: stored byte for byte
 *.exe binary
 *.tar.gz binary
 *.txt text eol=lf

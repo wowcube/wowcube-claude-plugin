@@ -1,4 +1,4 @@
-# Hidden launch + visibility watchdog, shared by tools\sim\run_hidden.ps1 and tools\cube_upload\run_upload.ps1.
+# Hidden launch + visibility watchdog, shared by the hidden-run tools (tools\sim\run_hidden.ps1, stop.ps1).
 # Dot-source it:  . (Join-Path $PSScriptRoot 'hidden_launch.ps1')
 #
 #   $procId = Start-HiddenProcess -Exe <exe> -WorkDir <dir> [-Arguments '--mcp-port 8177'] [-Env @{K='v'; X=$null}]

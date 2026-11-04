@@ -3,7 +3,7 @@
 
     python check_template_frame.py <frame.png>
 
-Demo 0 shows the teal arrow disc (sprite shape_arrow, drawn by tools/template/make_template_assets.py) on all four
+Demo 0 shows the teal arrow disc (sprite shape_arrow, the template's own art) on all four
 TOP screens and on one FRONT screen (top-left); every other screen is black.
 Exit 0 = matches, 1 = does not, 2 = unreadable. Needs Pillow.
 """

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Linux/macOS mirror of new_app.ps1: scaffold app_<name> from the AI template in the octavios dev layout, pack its
+# Linux/macOS mirror of new_app.ps1: scaffold app_<name> from the AI template in the app layout, pack its
 # assets, build the game's plugin for the standalone simulator, and (--smoke) prove it renders with one HIDDEN,
 # MUTED run.
 #

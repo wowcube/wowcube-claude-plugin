@@ -3,7 +3,7 @@
 #
 #   tools/sim/run_hidden.sh <app_dir> [--seconds 15] [--every-ms 500] [--face -1] [--mcp-port 8177]
 #                           [--out-dir <dir>] [--work-dir <dir>] [--fresh-saves] [--allow-drops] [--exe <wowcube-sim>]
-#                           [--no-keepalive] [--keepalive-sec 25]
+#                           [--no-keepalive] [--keepalive-sec 25] [--allow-early-stop]
 #
 # Starts the installed simulator (sim_path.sh sim_exe; refused unless sim_check finds the version this checkout
 # needs; --exe <path> skips that check) --headless --mute --game <app_dir> --seconds S [--frames <out>/frames ...]
@@ -17,6 +17,9 @@
 # exe, start_time, out_dir, work_dir, log, mcp_port, seconds, every_ms, ends_at = when --seconds runs out, run_id):
 # mcp_port is filled in the moment the "[mcp] control socket listening" line appears (read the port from there, the
 # simulator moves to the next port when one is taken); exit and ended_at are added when the run is over.
+# Stop an instance early (a playtest that is done) with tools/sim/stop.sh <out-dir>/run_info.json: it stops only that
+# PID (and its process group) and only while it still runs the recorded exe. --allow-early-stop accepts a run ended
+# that way (exit 0 instead of 7); --seconds 0 (until stopped) needs it.
 #
 # Exit codes: 0 completed (sim_summary.txt) | 1 setup error | 3 did not end in time (killed) | 4 no frames |
 #             5 crashed (signal or exit 99) | 6 start error (simulator exit 10-14, sim_error.txt) | 7 ended early |
@@ -30,13 +33,15 @@
 # --keepalive-sec seconds it spins the cube 1080 deg about the vertical axis (36 MCP `turn 30 0 0`, one a frame, ~0.6 s):
 # sustained movement for the engine, so the idle minute that dims the cube and PAUSES the game (battery save) never
 # runs out, while gravity in cube space (tilt) is unchanged. --no-keepalive only to test battery save itself. Pulses
-# are logged to <out-dir>/keepalive.log (an MCP tap landing inside a pulse may be dropped: retry it).
+# are logged to <out-dir>/keepalive.log (an MCP tap landing inside a pulse may be dropped: send it again);
+# run_info.json says "keepalive": "starting" until its first complete pulse, then true ("failing" / "failed": see
+# the log).
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 APP_DIR=''; SECONDS_RUN=15; EVERY_MS=500; FACE=-1; MCP_PORT=8177; OUT=''; WORK=''; FRESH=0; EXE=''; ALLOW_DROPS=0
-KEEPALIVE=1; KEEPALIVE_SEC=25
+KEEPALIVE=1; KEEPALIVE_SEC=25; ALLOW_EARLY_STOP=0
 fail() { printf 'ERROR: %s\n' "$2" >&2; exit "$1"; }
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,12 +56,14 @@ while [ $# -gt 0 ]; do
         --exe)         EXE="$2"; shift 2;;
         --no-keepalive) KEEPALIVE=0; shift;;
         --keepalive-sec) KEEPALIVE_SEC="$2"; shift 2;;
-        -h|--help)     sed -n '2,33p' "$0"; exit 0;;
+        --allow-early-stop) ALLOW_EARLY_STOP=1; shift;;
+        -h|--help)     sed -n '2,38p' "$0"; exit 0;;
         -*)            fail 1 "unknown argument: $1";;
         *)             APP_DIR="$1"; shift;;
     esac
 done
 [ -n "$APP_DIR" ] && [ -d "$APP_DIR" ] || fail 1 "usage: run_hidden.sh <app_dir> [...] (app folder not found: '$APP_DIR')"
+[ "$SECONDS_RUN" -gt 0 ] || [ "$ALLOW_EARLY_STOP" -eq 1 ] || fail 1 "--seconds 0 runs until stopped: pass --allow-early-stop (stop it with tools/sim/stop.sh)"
 APP_DIR="$(cd "$APP_DIR" && pwd)"
 case "$(uname -s)" in Darwin) os=macos; ext=dylib;; Linux) os=linux; ext=so;; *) fail 1 "unsupported OS (Windows: run_hidden.ps1)";; esac
 . "$repo/tools/sim/sim_path.sh"
@@ -82,7 +89,7 @@ mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 [ -n "$WORK" ] || WORK="$OUT/work"
 mkdir -p "$WORK"; WORK="$(cd "$WORK" && pwd)"; FRAMES="$OUT/frames"
 if ls "$FRAMES"/frame_*.png >/dev/null 2>&1; then fail 1 "$FRAMES already holds frames of another run: pass a new --out-dir (or none)"; fi
-rm -f "$WORK/sim_summary.txt" "$WORK/sim_error.txt"
+rm -f "$WORK/sim_summary.txt" "$WORK/sim_error.txt" "$OUT/stop_requested"
 args=(--headless --mute --run-id "$RUN_ID" --game "$APP_DIR" --seconds "$SECONDS_RUN" --mcp-port "$MCP_PORT" --workdir "$WORK" --face "$FACE")
 [ "$EVERY_MS" -gt 0 ] && args+=(--frames "$FRAMES" --every-ms "$EVERY_MS")
 [ "$FRESH" -eq 1 ] && args+=(--fresh-saves)
@@ -116,11 +123,13 @@ PGID=$!
 # run_info.json now, while the instance runs (a playtest reads ends_at and mcp_port from it)
 RI_PID="$PGID"; RI_EXE="$EXE"; RI_START="$(ri_iso_utc)"; RI_OUT="$OUT"; RI_WORK="$WORK"; RI_LOG="$WORK/log_linux.txt"
 RI_MCP_PORT=''; RI_SECONDS="$SECONDS_RUN"; RI_EVERY_MS="$EVERY_MS"; RI_ENDS_AT="$(ri_ends_at "$SECONDS_RUN")"
-RI_RUN_ID="$RUN_ID"; RI_EXIT=''; RI_ENDED=''; RI_KEEPALIVE="$KEEPALIVE"; RI_KEEPALIVE_LOG=''
-[ "$KEEPALIVE" -eq 1 ] && RI_KEEPALIVE_LOG="$KA_LOG"
+RI_RUN_ID="$RUN_ID"; RI_EXIT=''; RI_ENDED=''; RI_KEEPALIVE=false; RI_KEEPALIVE_LOG=''
+# "starting" until keepalive.py's first complete pulse sets it to true in the file (ri_keepalive_read keeps that)
+[ "$KEEPALIVE" -eq 1 ] && { RI_KEEPALIVE=starting; RI_KEEPALIVE_LOG="$KA_LOG"; }
 ri_write "$OUT/run_info.json"
-echo "started hidden: pid $PGID  run info: $OUT/run_info.json (ends_at ${RI_ENDS_AT:-never})"
-limit=$((SECONDS_RUN + 40)); waited=0; code=''
+echo "started hidden: pid $PGID  run info: $OUT/run_info.json (ends_at ${RI_ENDS_AT:-never}; stop early: tools/sim/stop.sh $OUT/run_info.json, exit 7 unless --allow-early-stop)"
+limit=$((SECONDS_RUN + 40)); [ "$SECONDS_RUN" -gt 0 ] || limit=86400
+waited=0; code=''
 while kill -0 "$PGID" 2>/dev/null; do
     if [ -z "$RI_MCP_PORT" ] && [ $((waited % 5)) -eq 0 ]; then
         RI_MCP_PORT="$(ri_mcp_port "$OUT/stdout.txt")"
@@ -130,7 +139,7 @@ while kill -0 "$PGID" 2>/dev/null; do
             if [ "$KEEPALIVE" -eq 1 ]; then
                 # ends itself when the simulator closes the socket; stopped below otherwise (only this PID)
                 "$PY" "$here/keepalive.py" --port "$RI_MCP_PORT" --period "$KEEPALIVE_SEC" --first "$KEEPALIVE_SEC" \
-                    --log "$KA_LOG" > /dev/null 2>&1 &
+                    --log "$KA_LOG" --run-info "$OUT/run_info.json" > /dev/null 2>&1 &
                 KA_PID=$!
                 echo "keep-alive: pid $KA_PID, a yaw pulse every $KEEPALIVE_SEC s (log $KA_LOG; off: --no-keepalive)"
             fi
@@ -153,8 +162,18 @@ if [ -n "$KA_PID" ]; then
 fi
 [ -n "$RI_MCP_PORT" ] || RI_MCP_PORT="$(ri_mcp_port "$OUT/stdout.txt")"
 RI_EXIT="$code"; RI_ENDED="$(ri_iso_utc)"
+[ "$KEEPALIVE" -eq 1 ] && { ka_now="$(ri_keepalive_read "$OUT/run_info.json")"; [ -n "$ka_now" ] && RI_KEEPALIVE="$ka_now"; }
 ri_write "$OUT/run_info.json"
 echo "pid $PGID: exit=$code mcp_port=${RI_MCP_PORT:-not seen}"
+
+# stopped on purpose (tools/sim/stop.sh leaves <out>/stop_requested before it signals): accepted with --allow-early-stop
+if [ "$code" != timeout ] && [ -f "$OUT/stop_requested" ] && ! { [ "$code" -eq 0 ] && [ "$(sed -n 's/^completed=//p' "$WORK/sim_summary.txt" 2>/dev/null | head -n 1)" = 1 ]; }; then
+    if [ "$ALLOW_EARLY_STOP" -eq 1 ]; then
+        echo "NOTE: stopped before its timed exit (exit $code, tools/sim/stop.sh) - accepted: --allow-early-stop"
+        exit 0
+    fi
+    fail 7 "stopped before its timed exit (exit $code, tools/sim/stop.sh) without --allow-early-stop"
+fi
 
 [ "$code" = timeout ] && fail 3 "did not end within $limit s - its process group was killed"
 [ -f "$WORK/sim_error.txt" ] && fail 6 "start error: $(tr '\n' ' ' < "$WORK/sim_error.txt")"

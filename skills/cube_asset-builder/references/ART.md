@@ -24,7 +24,7 @@ Chain for a `codex` / `image_api` choice, first hit wins:
 
 | # | Provider | Needs | How it draws |
 |---|---|---|---|
-| 0 | `codex` (only when the user picked it: `art.source: codex`) | Codex CLI logged in with the user's ChatGPT account: newest `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe` or `codex` on PATH; `codex login status` mentions ChatGPT (a Codex logged in with an OpenAI API key bills that key: `art_codex.py` refuses to draw until the user runs `codex login` with ChatGPT) | `build_pipeline.py generate` delegates the whole manifest to `ART gen` + `ART process` (style anchors, chroma-key backdrop, sets, colour lock); `genimg.py` one-offs go through a throw-away art.json |
+| 0 | `codex` (only when the user picked it: `art.source: codex`) | Codex CLI logged in with the user's ChatGPT account: newest `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe` or `codex` on PATH; `codex login status` mentions ChatGPT (a Codex logged in with an OpenAI API key bills that key: `art_codex.py` refuses to draw until the user runs `codex login` with ChatGPT) | `build_pipeline.py generate` delegates the whole manifest to `ART gen` + `ART process` (style anchors, chroma-key backdrop, sets, color lock); `genimg.py` one-offs go through a throw-away art.json |
 | 1 | any key/URL | `IMAGE_API` env var (bare key/URL or JSON `{"provider","key","base_url","model"}`) | paid (or local SD); one `genimg` call per sprite |
 | 2 | any key/URL | `~/.wowcube/image_api.json` (written by `image_providers.save_provider()`; owner-only `0600` on Linux/macOS, on Windows it relies on the user profile's per-user permissions) | same |
 | 3 | OpenRouter | `OPENROUTER_API_KEY` env var (last: such a key is often set for something else, so an explicit choice in 1 or 2 wins) | paid |
@@ -33,17 +33,17 @@ Chain for a `codex` / `image_api` choice, first hit wins:
 - **Paid keys are opt-in.** Steps 1-3 are used only with `WOWCUBE_ALLOW_PAID_IMAGES=1` (or `--allow-paid` on
   `build_pipeline.py generate`, `gen_sprites.py`, `genimg.py`); without it a key found in the environment is ignored and
   generation stops with exit 3 and the reason (an agent once paid through a key that happened to be set). Set the
-  opt-in only when the user explicitly asked for a paid provider and agreed to pay per image: an autonomous or `YOLO`
-  run is not consent. No Codex and no opt-in → the procedural style (below).
+  opt-in only when the user explicitly asked for a paid provider and agreed to pay: asked ONCE per run with the quoted
+  cost (price per image times the pictures the run needs), never per batch; an autonomous or `YOLO` run is not consent. No Codex and no opt-in → the procedural style (below).
 - A server on this machine (`http://localhost`, `127.x.x.x`, `[::1]`) is free and needs no opt-in: a local Stable
   Diffusion URL, or `{"provider": "openai", "base_url": "http://localhost:<port>/v1"}` for a local OpenAI-compatible
-  server (the `openai` provider honours `base_url`). Any other URL (a LAN or hosted server) counts as external and
+  server (the `openai` provider honors `base_url`). Any other URL (a LAN or hosted server) counts as external and
   needs it.
 - `WOWCUBE_NO_CODEX=1` skips step 0 (use a key although Codex is logged in).
 - Keys are recognised by pattern: `sk-or-` OpenRouter, `sk-` OpenAI, `xai-` xAI, `AIza` Gemini, `http(s)://` local Stable Diffusion (A1111). DeepSeek keys also start with `sk-`, but DeepSeek has no image API: such a key is sent to OpenAI and fails authentication. A rejected key (HTTP 401/403) is reported once, naming the provider and the key prefix, and never retried.
 - A URL must be an Automatic1111-compatible server (`/sdapi/v1/...`, e.g. A1111 or Forge started with `--api`). ComfyUI and other servers are not supported: their 404 on `/sdapi` stops generation with that message.
 - `image_providers.validate(cfg)` is the cheapest check per provider (Codex: `codex login status`).
-- The paid path loses what only art.py has (anchors, subject references, shared scale, colour lock): it puts `_style` in front of each `gen_prompt`, asks for a flat backdrop, removes it by flood fill and resizes. Run the same QA (`ART qa M`) and review on its output.
+- The paid path loses what only art.py has (anchors, subject references, shared scale, color lock): it puts `_style` in front of each `gen_prompt`, asks for a flat backdrop, removes it by flood fill and resizes. Run the same QA (`ART qa M`) and review on its output.
 - Never ask the user for a key while Codex works; never type credentials (`codex login` is the user's).
 
 ## No Codex: what still works with a paid provider
@@ -51,7 +51,7 @@ Chain for a `codex` / `image_api` choice, first hit wins:
 `ART candidates` and `ART gen` call the Codex CLI directly; without Codex they cannot draw. Every other art.py command works on images that already exist, so a paid provider the user opted in to (or a local Stable Diffusion) still gives a style lock and the strict QA loop:
 
 1. **Draw** with the provider: `python <skills>/scripts/build_pipeline.py generate --manifest M --workspace assets_<game>` (first `--group <g>` for the style frame's leaders, later the rest). Each sprite is drawn from `_style` + its `gen_prompt` on a flat backdrop, flood-filled and fitted to `size` straight into `assets_<game>/art/`; `fixes.json`, anchors and subject references are not used on this path. Every call is billed, so a sprite whose PNG already exists is kept (`--force` redraws it), and a failed sprite does not stop the batch: the rest is drawn, then every failure is listed (exit 6) and a rerun draws only the missing ones.
-2. **Hand the images to art.py**: copy them into `assets_<game>/raw/` under the same names (`Copy-Item assets_<game>\art\*.png assets_<game>\raw\` / `cp assets_<game>/art/*.png assets_<game>/raw/`). Then `ART process M` (re-key, shared scale per set, colour lock), the mock (below), the style lock from the approved leaders (`ART anchor M --only <leaders>`, `ART style M`), `ART qa M` and `ART review M` all work as on the Codex path.
+2. **Hand the images to art.py**: copy them into `assets_<game>/raw/` under the same names (`Copy-Item assets_<game>\art\*.png assets_<game>\raw\` / `cp assets_<game>/art/*.png assets_<game>/raw/`). Then `ART process M` (re-key, shared scale per set, color lock), the mock (below), the style lock from the approved leaders (`ART anchor M --only <leaders>`, `ART style M`), `ART qa M` and `ART review M` all work as on the Codex path.
 3. **Fix loop**: record each fix in `fixes.json` as usual (a later Codex run replays it) and redraw one sprite with the provider: `python <skills>/scripts/genimg.py "<_style> <gen_prompt> <fix line>" -o assets_<game>/raw/<name>.png --cutout` for a `key` sprite (add the backdrop sentence the provider path writes: "Square canvas, one subject centred with a clear margin, on a flat uniform #FF00FF magenta background, no shadow", green `#00FF00` for a pink subject); no `--cutout` for an opaque picture; `-i assets_<game>/raw/<leader>.png` attaches a subject reference (Codex and OpenRouter only). Then `ART process M --only <name>` and `ART qa M --only <name>`. A fix that belongs in the subject prompt goes back to Stage 2.
 4. The same QA rules apply (`cube_art-director/references/QA_RULES.md`); the style rules are measured against the anchors made in step 2. The final report says which provider drew the art.
 
@@ -63,7 +63,7 @@ When no provider resolves, or the only one found is a paid API the user did not 
 
 ## Placeholders (only on request)
 
-Only when the profile says `art.source: placeholder` (a quick technical build the user asked for). The agent draws each sprite itself (ad-hoc Pillow code) into `assets_<game>/art/<name>.png` and writes `assets_<game>/art/0.png` (1×1 transparent): exact manifest `size`; cut-outs RGBA with alpha 0 around the silhouette, opaque pictures alpha 255 everywhere; shapes and colours distinct enough to playtest. They pack like any art, are **never accepted as final**, and the hand-off says the graphics are temporary. Sounds still get `gen_sounds.py` placeholders (`build_pipeline.py generate` is not usable without a provider; run `python <skills>/scripts/gen_sounds.py M`).
+Only when the profile says `art.source: placeholder` (a quick technical build the user asked for). The agent draws each sprite itself (ad-hoc Pillow code) into `assets_<game>/art/<name>.png` and writes `assets_<game>/art/0.png` (1×1 transparent): exact manifest `size`; cut-outs RGBA with alpha 0 around the silhouette, opaque pictures alpha 255 everywhere; shapes and colors distinct enough to playtest. They pack like any art, are **never accepted as final**, and the hand-off says the graphics are temporary. Sounds still get `gen_sounds.py` placeholders (`build_pipeline.py generate` is not usable without a provider; run `python <skills>/scripts/gen_sounds.py M`).
 
 ## fixes.json
 
@@ -89,19 +89,19 @@ Only when the profile says `art.source: placeholder` (a quick technical build th
 | Key | Meaning |
 |---|---|
 | `<name>`: text or `{"text", "ref"}` | prompt line for that sprite; `ref` = an **asset name** whose raw image is attached as the subject reference (same design, only the asked change). Write asset names, not paths. |
-| `@colour_lock` | name prefixes: colour-matched to the first locked member of their set (same `group` and `size`) |
-| `@colour_exempt` | name substrings: intended colour changes (wounded, broken), matched among themselves |
+| `@colour_lock` | name prefixes: color-matched to the first locked member of their set (same `group` and `size`) |
+| `@colour_exempt` | name substrings: intended color changes (wounded, broken), matched among themselves |
 | `@fill` | name prefix → minimum share of the canvas the object must cover (cells, tiles) |
 | `@style_exempt` | name prefixes: approved departures from the style palette (logo, UI, sky); add them under "Approved exceptions" in STYLE.md |
 | `@pose_exempt` | name substrings: frames whose pose change is the point (scale rules only warn) |
-| `@fixed_canvas` | name substrings: scaled as drawn, no crop, no recentring, no shared-scale refit (same as the manifest's `"fit": "canvas"`); for frames whose geometry is the content: a draining timer ring, a progress bar, a growing burst. `@pose_exempt` does not do this: it only relaxes the QA numbers |
+| `@fixed_canvas` | name substrings: scaled as drawn, no crop, no recentering, no shared-scale refit (same as the manifest's `"fit": "canvas"`); for frames whose geometry is the content: a draining timer ring, a progress bar, a growing burst. `@pose_exempt` does not do this: it only relaxes the QA numbers |
 | `@post` | a workspace script `ART process` runs after every run as `python <script> <final dir> <names>`: processing fixes no option expresses (stamp an outline, re-crop around a ring, clamp chroma). Without it a later `process` silently undoes hand edits to the finals; a failing script fails `process`. It runs only after the user approved this exact script for this workspace: `ART process ... --trust-post` records the approval (the workspace's resolved path and the script's sha256) in `~/.wowcube/trusted_post.json`, outside every workspace, so a shared or downloaded workspace cannot bring its own; a changed script needs a new approval. The script must be a relative path inside the workspace (no absolute path, no `..`, no symlink out). An unapproved, missing or out-of-workspace script fails `process` (exit 1) before any final is replaced; pass `--trust-post` only after reading the script |
 
 An older workspace may hold `prompt_overrides.json` (keys `@colour_match`, `@colour_match_exclude`, `@fill_cell`); art.py reads it when `fixes.json` is absent.
 
 ## Keys and backdrops
 
-Every sprite's manifest `background` decides: `"key"` = drawn on a flat backdrop and keyed (binary alpha), `"opaque"` = full-canvas picture. Without the field art.py infers it (full colour or `flags.bg` → opaque; a prompt naming `#FF00FF`/`#00FF00` → key; otherwise opaque) — ask Stage 2 to add it. The backdrop is magenta unless the prompt or the style palette is pink/magenta/purple (then green); the colour used is recorded in `raw/keys.json`, so adding anchors later never re-keys an old image. Holes that must stay solid (glass, gaps) are described as dark in the prompt.
+Every sprite's manifest `background` decides: `"key"` = drawn on a flat backdrop and keyed (binary alpha), `"opaque"` = full-canvas picture. Without the field art.py infers it (full color or `flags.bg` → opaque; a prompt naming `#FF00FF`/`#00FF00` → key; otherwise opaque) — ask Stage 2 to add it. The backdrop is magenta unless the prompt or the style palette is pink/magenta/purple (then green); the color used is recorded in `raw/keys.json`, so adding anchors later never re-keys an old image. Holes that must stay solid (glass, gaps) are described as dark in the prompt.
 
 ## Mock
 
@@ -153,5 +153,5 @@ Default: one face = `[240, 240]`, grid `[2, 2]`, left and right edges tiling sea
 1. The manifest carries it as the sprite `launcher_icon` (`icon` is reserved): `[160, 160]`, `color: "palette"` + `flags.fullsize` (so the PNG keeps its transparent corners through processing), `background: "key"`, `group: "icon"`. It is drawn with the set (`ART gen`/`process`), so the anchors and the Prompt block apply.
 2. Check it like any asset, plus: the four corners transparent in the PNG, flat top and bottom edges, points left and right, readable at 80 px. If the badge outline breaks the style palette on purpose, add `"@style_exempt": ["launcher_icon"]` to `fixes.json` and note it under "Approved exceptions" in STYLE.md.
 3. Copy `assets_<game>/art/launcher_icon.png` to `app_<game>/art/icon.png` (replacing the template icon) and pack with `--icon app_<game>/art/icon.png`; the pack builds the launcher's `ico` map from it.
-4. **The packed tier decides whether the corners stay transparent.** The manifest's top-level `icon` object picks it: the default, full colour 160, is RAW565 with no transparency, so the corners render black on the dark launcher (a black square around the hexagon). Real transparent corners need `"icon": {"color": "palette", "side": 120}` (drawn ×2) or `240` (fullsize): the packer resizes the PNG to that side and keeps its alpha as palette index 0. Changing the `icon` object is a manifest change (Stage 2).
+4. **The packed tier decides whether the corners stay transparent.** The manifest's top-level `icon` object picks it: the default, full color 160, is RAW565 with no transparency, so the corners render black on the dark launcher (a black square around the hexagon). Real transparent corners need `"icon": {"color": "palette", "side": 120}` (drawn ×2) or `240` (fullsize): the packer resizes the PNG to that side and keeps its alpha as palette index 0. Changing the `icon` object is a manifest change (Stage 2).
 5. A manifest made before this rule has no `launcher_icon`: ask Stage 2 to add the entry (never hand-edit the manifest here).

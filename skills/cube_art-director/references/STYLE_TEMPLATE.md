@@ -15,24 +15,24 @@ Anything the artist corrects during review is added here (and to the
 - Exceptions (UI, logo, backgrounds): <...>
 
 ## Palette
-- Core colours (hex, role): <#16100c shadow wood, #3e291a mid wood, ...>
-- Accent colours and where they may appear: <warm yellow only on the fireflies and the lantern>
+- Core colors (hex, role): <#16100c shadow wood, #3e291a mid wood, ...>
+- Accent colors and where they may appear: <warm yellow only on the fireflies and the lantern>
 - Forbidden: <pure white, neon, rainbow gradients ...>
 - Value range: darkest <...>, lightest <...> (highlights only on <...>)
 
 ## Variant colours
-<!-- Optional. Colours a legitimate variant may use besides the anchors' palette: other ship or team
-     colours, a gold/silver/bronze set. One line per colour: hex + role. `art.py style` adds each as a
+<!-- Optional. Colors a legitimate variant may use besides the anchors' palette: other ship or team
+     colors, a gold/silver/bronze set. One line per color: hex + role. `art.py style` adds each as a
      shaded ramp of its hue to the measured palette (rerun it after a change). Leave empty when every
-     asset shares the anchors' colours. Example:
+     asset shares the anchors' colors. Example:
      - #2846d2 blue ship variant
      - #30a050 green ship variant -->
-- <none, or the colours as in the example above>
+- <none, or the colors as in the example above>
 
 ## Rendering
-- Outline: <colour, weight in FINAL pixels, where it is dropped>
+- Outline: <color, weight in FINAL pixels, where it is dropped>
 - Shading: <number of tone steps, cel / soft, dithering yes/no>
-- Light: <direction, colour, how strong>
+- Light: <direction, color, how strong>
 - Texture and detail density at final size: <what must survive the downscale>
 - Pixel grid: <true pixel art at final size / painterly downscaled / vector-flat>
 

@@ -1,4 +1,4 @@
-"""Beta (octavios dev) asset-container primitives.
+"""Beta asset-container primitives.
 
 The beta simulator loads an app from:
   <APP_DIR>/index.bin                  - kind-tagged asset manifest; record index == asset id
@@ -10,9 +10,9 @@ The beta simulator loads an app from:
                                          group whose sprites carry OCT_FLAG_ALPHA
   <APP_DIR>/sound/assets/<name>.mp3    - sounds (22050 Hz mono CBR 32k)
 
-Struct layouts mirror octavios/engine/oct_types.h + oct_pack.h and are pinned
-by tests/test_beta_container.py against golden files packed by the real beta
-utils.exe (from an internal example app).
+Struct layouts mirror the engine's octPlace_t / octBmp_t and pack headers (oct_types.h and the
+engine's pack header) and are pinned by the development repository's tests against golden files
+packed by the real beta utils.exe (from an internal example app).
 """
 from __future__ import annotations
 
@@ -33,13 +33,13 @@ KIND_SPRITE, KIND_SOUND, KIND_PAL, KIND_MAP = 0, 1, 2, 3
 OCT_PLACE_SIZE = 28             # sizeof(octPlace_t), oct_types.h
 OCT_PLACE_BMP_OFFSET = 16       # octPlace_t.BmpIdx (int16), within one place
 # The two map names the launcher looks up by name to draw an installed app's
-# icon: static "ico" and the hover animation "ahover" (engine oct_shell.h).
+# icon: static "ico" and the hover animation "ahover" (the engine's launcher).
 RESERVED_LAUNCHER_MAPS = ("ico", "ahover")
 ASSET_NAME_MAXLEN = 24          # incl. NUL, oct_consts.h OCT_ASSET_NAME_MAXLEN
-# OCT_ASSETS_CAP, engine/oct_pack_format.h (octavios dev): every index.bin
+# OCT_ASSETS_CAP of the current engine's pack format: every index.bin
 # record counts - sprites incl. font glyphs, palettes, maps, sounds and the
-# reserved "zero". Older firmware/SDKs (engine/oct_pack.h before the dev
-# format header) had 2048; a pack between 2049 and 5120 assets needs the dev
+# reserved "zero". Older firmware/SDKs (before the current pack format)
+# had 2048; a pack between 2049 and 5120 assets needs the dev
 # firmware on the cube.
 ASSETS_CAP = 5120
 ASSETS_CAP_OLD_FIRMWARE = 2048
@@ -47,7 +47,7 @@ EXT_MAX_DESCS = 512             # launcher sees only the first 512 descriptors
 INDEX_RECORD = struct.Struct("<i24s")
 BMP_SIZE = 48
 
-# .oct pack layout, mirrors engine/oct_pack.h (field offsets confirmed by
+# .oct pack layout, mirrors the engine's pack header (field offsets confirmed by
 # tests against a real simulator-built pack)
 OCT_HEADER_SIZE = 232           # sizeof(octPackHeader_t)
 OCT_DESC_SIZE = 84              # sizeof(octAssetDesc_t)
@@ -56,7 +56,7 @@ OCT_PACK_FORMAT_SUPPORTED = 4
 OCT_ENGINE_VERSION_CURRENT = 2
 SOFTWARE_NAME_MAXLEN = 80       # oct_consts.h OCT_SOFTWARE_NAME_MAXLEN
 
-# APP_CATEGORIES macro spellings (engine/oct_consts.h) so an app.h that says
+# APP_CATEGORIES macro spellings (oct_consts.h) so an app.h that says
 # `(APP_CATEGORY_GAME)` resolves without a C preprocessor
 _CATEGORY_MACROS = {
     "OCT_CAT_LAUNCHER": 1 << 0, "OCT_CAT_CHARGER": 1 << 1,
@@ -74,11 +74,11 @@ OCT_FLAG_FULLSIZE = 1 << 1
 OCT_FLAG_ADDITIVE = 1 << 2
 OCT_FLAG_BG = 1 << 3
 OCT_FLAG_RAW565 = 1 << 7
-# octBmp_t::Compression sub-format for a RAW565 payload, mirrors engine/oct_consts.h
+# octBmp_t::Compression sub-format for a RAW565 payload, mirrors oct_consts.h
 RAW565_PLAIN, RAW565_RLE = 0, 1
 
 # .pal word layout for a group whose sprites carry OCT_FLAG_ALPHA, mirrors
-# engine/oct_render.h::OCT_BLEND_alpha (`alpha = pe >> 27`, `fg = pe &
+# the engine's OCT_BLEND_alpha (`alpha = pe >> 27`, `fg = pe &
 # 0x07FFFFFF`, "Already spread in pallette"). Without the flag the word is
 # plain `c | c << 16` instead -- see build_pal.
 PAL_SPREAD_MASK = 0x07E0F81F        # engine SPREAD_MASK
@@ -487,7 +487,7 @@ def pal_word_plain(rgb565: int) -> int:
 def pal_word_spread(rgb565: int, alpha8: int) -> int:
     """The alpha palette word: 5-bit alpha over pre-spread RGB.
 
-    ``OCT_BLEND_alpha`` (engine ``oct_render.h``) reads it as::
+    ``OCT_BLEND_alpha`` (the engine's blend code) reads it as::
 
         alpha = pe >> 27;              // 5 bits
         fg    = pe & 0x07FFFFFF;       // already (fg | fg << 16) & 0x07e0f81f
@@ -1158,7 +1158,7 @@ def emit_beta_layout(
     build_index_bin(records)   # validates count <= ASSETS_CAP and name lengths early
     if len(records) > ASSETS_CAP_OLD_FIRMWARE:
         print(f"  NOTE: {len(records)} assets - over the {ASSETS_CAP_OLD_FIRMWARE} older firmware "
-              f"accepted (OCT_ASSETS_CAP is {ASSETS_CAP} on octavios dev): the cube needs dev firmware")
+              f"accepted (OCT_ASSETS_CAP is {ASSETS_CAP} on current firmware): the cube needs current firmware")
 
     seq = _seq_chain(sprite_ids)
     rates: dict[str, int] = {}
@@ -1338,7 +1338,7 @@ def emit_beta_layout(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # .oct pack assembly (pure-python replacement for the simulator's
-# SIM_build_pack, octavios/sim/src/sim.h)
+# SIM_build_pack)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _parse_c_int(token: str) -> int | None:
@@ -1562,7 +1562,7 @@ def read_app_defines(app_h: str | Path) -> dict:
     text = _app_header_text(Path(app_h))
     out: dict = {}
     func_macros = _collect_func_macros(text)
-    # octavios dev (>= 2026-08-25) versions apps through engine/oct_app_version.h:
+    # Current firmware (>= 2026-08-25) versions apps through oct_app_version.h:
     # APP_VERSION OCT_APP_SEMVER(APP_VERSION_MAJOR, APP_VERSION_MINOR, APP_VERSION_PATCH),
     # scheme byte 1 on top. The engine header is not ours to read, so mirror it here.
     func_macros.setdefault("OCT_APP_SEMVER", (["major", "minor", "patch"],
@@ -1605,7 +1605,7 @@ def read_app_defines(app_h: str | Path) -> dict:
         if raw is not None:
             out[key] = _parse_int_expr(expand_objects(raw, define), define, func_macros)
 
-    # Save area (octavios dev): declared ONLY through app_metadata.h's own
+    # Save area (current firmware): declared ONLY through app_metadata.h's own
     # includes (the dev packer compiles that header alone), as
     # APP_SAVE_SIZE sizeof(<record>) with a static_assert of the wire size
     # in app_save.h, or as a plain number. Without it the app has no save area.
@@ -1629,7 +1629,7 @@ def read_app_defines(app_h: str | Path) -> dict:
 def extract_gnu_build_id(elf: bytes) -> bytes | None:
     """20-byte GNU build-id (NT_GNU_BUILD_ID) of a little-endian ELF32 image,
     or None. Mirrors the sim's SIM_extract_gnu_build_id
-    (octavios/sim/src/oct_elf_build_id.h): malformed input yields None."""
+    (the simulator's ELF build-id reader): malformed input yields None."""
     if len(elf) < 52 or elf[:4] != b"\x7fELF" or elf[4] != 1 or elf[5] != 1:
         return None
     sh_off, = struct.unpack_from("<I", elf, 32)
@@ -1679,7 +1679,7 @@ def build_oct(app_dir: str | Path, code_bin: str | Path, out_path: str | Path,
     time; this builder pins 0 so the same inputs always produce the same
     bytes).
 
-    Layout (engine/oct_pack.h): 232-byte octPackHeader_t, then one 84-byte
+    Layout (the engine's pack header): 232-byte octPackHeader_t, then one 84-byte
     octAssetDesc_t per index.bin record (record index == asset id; sprite
     descs embed the payload's leading octBmp_t so the engine can cull without
     the disk), then the payloads 4-byte aligned in id order, then the ARM

@@ -94,12 +94,17 @@ cannot judge (sizes that read like on-screen pixels, panoramas, the sound plan):
   continuous and upright around the four side faces; unique objects (sun, moon)
   appear exactly once on the cube.
 - **Animation from video** (optional): only when the user named an image-to-video service at setup
-  (`art.animation: "video"`) or asks for it, its connector's tools are in the session and they agreed to
-  the quoted credits once for this run. Then looping idles, walk/run cycles and short in-place actions are
+  (`art.animation: "video"`) or asks for it, the profile's `data_policy.may_leave_machine` contains
+  `animation_frames` (the base picture and the motion description go to the service; never under
+  `may_leave_machine: []`), its connector's tools are in the session and they agreed to the quoted
+  credits once for this run. Then looping idles, walk/run cycles and short in-place actions are
   animated from the approved first frame and cut with `scripts/video_to_frames.py`; the frames get
   `"fit": "canvas"` and the same `process` / `qa` / review. A video job counts in the image budget as the
-  frames it replaces (`art.py budget M --video <anim>`, before it is submitted).
-  `cube_art-director/references/ANIMATION_VIDEO.md`.
+  frames it replaces: `art.py budget M --video <anim> --quote` (checks it fits, records nothing), the
+  user's yes to the quoted credits, then `art.py budget M --video <anim> --credits <C>` once, right before
+  the job is submitted (`--drop` for a recorded job that was never submitted). The service's own image
+  models draw a base picture only when the user named it as their picture tool too, its GPT image model
+  never when the user has ChatGPT. `cube_art-director/references/ANIMATION_VIDEO.md`.
 - **Animation**: 20 fps is the hardware cap; there is no pack-size or clip-length
   budget (many frames, even video sequences, are fine). "One animated full-screen
   (fullsize) picture per physical module" is a guideline (unconfirmed), informational
@@ -127,30 +132,34 @@ palette of 8-16 named colours, simple shading rules). It is a final style, not p
 through the style lock (the frame and the mock), `art.py process`, `qa` and the review like generated
 art, and the report says it was drawn in code on purpose. Nothing leaves the machine.
 
-Procedural steps (they replace `candidates`, `gen` and `build_pipeline.py generate`, which would look for
-Codex or a provider; everything else in §2-§3 applies unchanged):
+**Procedural steps P1-P5** (they replace `candidates`, `gen` and `build_pipeline.py generate`, which would look for
+Codex or a provider; everything else in §2-§3 applies unchanged). They apply to the procedural style
+only; the style-lock steps 1-6 below apply to every source (for the procedural style, step 2's
+"style frames" are P5's leaders):
 
-1. **One script**, `assets_<game>/procedural/draw.py`: reads the manifest, one function per family,
+- P1. **One script**, `assets_<game>/procedural/draw.py`: reads the manifest, one function per family,
    the STYLE.md palette as named constants, rerunnable (`python assets_<game>/procedural/draw.py
    plans/<game>_assets.json [names...]`). A fix is a change to the script, recorded in `fixes.json` as
    a note, then a rerun; never a hand edit of a PNG.
-2. **Output**: `assets_<game>/raw/<name>.png` for every sprite (never `art/`: `process` writes `art/`).
+- P2. **Output**: `assets_<game>/raw/<name>.png` for every sprite (never `art/`: `process` writes `art/`).
    `background: "key"` sprites: RGBA on a **transparent** canvas (no key colour), the manifest's aspect,
    4-8x its `size` (supersampled; `process` box-downscales, binary alpha by default). `background:
    "opaque"` sprites: a full RGB picture at the manifest's aspect. Never an exact-size drawing without
    `"fit": "canvas"`: the default fit crops to the object and scales it up to fill the frame. (Mod mode's
    edited originals are the exception: edited at their exact size with `"fit": "canvas"`, cube_orchestrator
    SKILL.md, "Raw images for `process`".)
-3. **Animations**: draw every frame of one animation on the same canvas size with the subject's
+- P3. **Animations**: draw every frame of one animation on the same canvas size with the subject's
    anchor at the same place. Frames whose geometry is the content (a draining timer ring, a progress
    bar, a growing burst) need `"fit": "canvas"` in the manifest (or `@fixed_canvas` in `fixes.json`):
    `process` then scales the whole canvas as drawn. Without it frames are cropped, rescaled to one
    shared scale and centred on their centre of mass (`@pose_exempt` only relaxes the QA numbers).
-4. `art.py process M` → `assets_<game>/art/`. It records the backdrop decision of every keyed raw in
+- P4. `art.py process M` → `assets_<game>/art/`. It records the backdrop decision of every keyed raw in
    `raw/keys.json` (`none` for a transparent drawing, else the key colour) and `art.py qa M` checks
    the same key. Never write `keys.json` by hand unless a raw really is on `#FF00FF` / `#00FF00`.
-5. Style lock: the leaders drawn by the script are the style frames; the mock as usual; then
+- P5. Style lock: the leaders drawn by the script are the style frames; the mock as usual; then
    `art.py anchor M --only <leaders>` and `art.py style M`. Images cost no budget.
+
+**Style-lock steps 1-6** (every source):
 
 1. **Style bible.** Copy `<skills>/skills/cube_art-director/references/STYLE_TEMPLATE.md`
    to `assets_<game>/style/STYLE.md` and fill it from the GDD's art direction and any
@@ -229,7 +238,7 @@ Through `cube_asset-builder`:
    drops the waiver when the image changes (cube_art-director `references/QA_RULES.md`).
    Never add anchors, split sets or drop rules only to silence a check (a QA run spent
    ~25 min doing that, and removing one anchor broke the palette check of every yellow
-   sprite). Technical checks (size, cut-out, key, alpha, missing, empty) cannot be waived.
+   sprite). Technical checks (size, cut-out, key, alpha, opaque, missing, empty, kept-file) cannot be waived.
    Every real FAIL gets a cause-level fix (a prompt line in `fixes.json`, a better subject
    reference, the green key, `fill`; exemptions only for intended changes) and a redraw
    of what failed plus the set partners that must match. A correction of the **look**
@@ -239,7 +248,8 @@ Through `cube_asset-builder`:
    overrides contradicting words in it; `art.py gen` warns when a note rules out something
    the prompt still asks for (QA_RULES.md S6):
    `art.py gen <manifest> --only <names> --force`, then `process` and `qa`.
-   **Repeat until every rule in QA_RULES.md passes** (`art.py qa` clean, no critical or
+   **Repeat until every rule in QA_RULES.md passes or is waived** (`art.py qa` clean: every
+   numeric FAIL fixed or, after a look at the picture, waived as false with `art.py waive`; no critical or
    major reviewer finding open; minors follow the §10 exit rule). There is no "accept
    after N rounds" for hard failures. Escalate only when a rule genuinely cannot be met, saying what was tried:
    *(stepwise)* ask the user; autonomous: simplify the asset within its manifest entry
@@ -256,17 +266,22 @@ Through `cube_asset-builder`:
    that does not fit in what is left (art.py exit 4, nothing drawn). `art.py budget <manifest>` prints
    the state; `--over-budget` draws past it only on the user's explicit yes. The procedural style and
    the user's own art cost none. Once it is spent: no more
-   redraws; fix what processing can fix (`process` options, `@post`), then waive each
-   style or set rule still failing: per asset with `art.py waive ... --reason
-   "accepted under budget: <the finding>"`, or for a whole class with `fixes.json`
-   `@style_exempt` / `@colour_exempt` / `@pose_exempt` / `@fill` (plus the line under
-   "Approved exceptions" in STYLE.md, with the finding), and list them in the final report
-   as `accepted_under_budget`; then pack and go on to Stage 4 (a spent image budget never stops the
+   redraws; fix what processing can fix (`process` options, `@post`), then accept each
+   real style or set FAIL still left **under budget**, a path distinct from waiving a false FAIL:
+   per asset with `art.py waive <manifest> --only <asset> --check <id> --under-budget --reason
+   "accepted under budget: <the finding>"` (recorded as `accepted_under_budget`, apart from waivers), or for a
+   whole class with `fixes.json` `@style_exempt` / `@colour_exempt` / `@pose_exempt` / `@fill`
+   (plus the line under "Approved exceptions" in STYLE.md, with the finding). This is the **one
+   sanctioned exception** to "never drop rules to silence a check" above: only once the image budget
+   is spent, and every one with a recorded finding in the context's `accepted_under_budget`
+   (`AGENT_BRIEFS.md`, "Context file"), listed in the final report apart from the false FAILs waived
+   after a look; then pack and go on to Stage 4 (a spent image budget never stops the
   run, `RUN_MODES.md` failure policy 3). A hard failure no key waives (wrong size, key colour left,
    an empty frame) is a processing problem: fix it with `process`; if one remains, Stage 3
    is not done (*(stepwise)* ask; autonomous: report it and stop before packing). On a real run three
-   fresh reviews of 9 sprites took ~42 min and ~580k tokens, longer than all the drawing:
-   say so when the user sets a tight cap.
+   fresh reviews of 9 sprites took ~42 min and ~580k tokens, longer than all the drawing (about
+   12–15 min per review; `RUN_MODES.md`, "Estimate", counts them in every row): say so when the user
+   sets a tight cap.
 4. **Fresh-agent consistency review** (§10) before anyone sees the batch; its findings
    go through the same loop. A read-only Codex pass (`cube_art-director/references/CODEX.md`)
    is a useful second opinion when you and the reviewer disagree.
@@ -278,11 +293,12 @@ Through `cube_asset-builder`:
 
 **Fallbacks**, only when Codex cannot draw:
 - by default, the procedural style (agent-drawn in code, final quality) (above): a deliberate style that goes through the same
-  style lock, QA and review as generated art; the report says it was drawn in code and that
-  `codex login` brings generated art if wanted. Temporary placeholders only when the profile
+  style lock, QA and review as generated art; the report says, in plain words, that the pictures were
+  drawn in code on purpose and that signing in to ChatGPT's drawing tool brings generated pictures if
+  wanted (the command, `codex login`, only when the user asks how). Temporary placeholders only when the profile
   says `art.source: placeholder`;
-- a paid image API only when the user, in this run, explicitly asked for it and agreed to pay
-  (`--allow-paid`; a configured key is not consent; autonomous and `YOLO` never imply it,
+- a paid image API only when the user, in this run, explicitly asked for it and agreed to the quoted
+  cost, asked once per run (`--allow-paid`; a configured key is not consent; autonomous and `YOLO` never imply it,
   `RUN_MODES.md`): `build_pipeline.py generate` draws every sprite
   with it (`scripts/image_providers.py`). `art.py candidates` and `art.py gen` call Codex
   directly and are not available; what still works on the provider's images (copied into
@@ -512,8 +528,8 @@ then left unchecked. One rule, in this order:
    "note"}]}`. It judges those findings only, not the whole set, so it costs a fraction of a fresh review.
    One focused re-check per round of fixes, at most two rounds (`full`: three).
 3. A finding the re-check still calls open, or one with no fix left to try (the image budget is spent,
-   or the rule cannot be met), is **waived on the record**: `accepted_majors: [{"finding", "asset",
-   "reason": "review budget spent"}]` in the context (criticals are never waived: an unusable asset
+   or the rule cannot be met), is **waived on the record**: `accepted_majors: [{"asset", "finding",
+   "reason": "review budget spent"}]` in the context (the one shape, `AGENT_BRIEFS.md` "Context file") (criticals are never waived: an unusable asset
    blocks the pack, §3 "Escalate"). The final report lists every waived major with the asset's path,
    and a stepwise run shows them to the user before the pack.
 

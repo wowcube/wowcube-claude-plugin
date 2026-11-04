@@ -88,7 +88,7 @@ ALLOWED_ICON_COLORS = frozenset({"palette", "full"})
 ICON_DEFAULT_SIDE = 160
 ICON_MAX_SIDE = 240
 ICON_PALETTE_SIDES = (120, 240)
-# The engine streams sounds through a small window (octavios dev, 2026-09):
+# The engine streams sounds through a small window (firmware since 2026-09):
 # no 2 s / 64 KB cap any more, music beds and long loops are fine. The bound
 # below only catches typos (a 10-minute ceiling).
 SOUND_MAX_DURATION_MS = 600_000

@@ -4,7 +4,7 @@ Code reviewers read code; nobody looked at the screen. On a shipped game, prompt
 passed both code verifiers with a black cross across all 24 screens (a packer pivot
 bug); on the next one a 2-px background cross on every face (full-screen art placed at
 +-120 instead of +-119.5) passed code review at 100/100 and was found only on the frames. So after **every coder and every fixer run** the orchestrator builds the
-simulator, runs it hidden, dumps all 24 screens, and **looks at the frames itself**
+game's plugin for the automatic checks, runs it hidden in the bundled simulator, dumps all 24 screens, and **looks at the frames itself**
 before the prompt counts as done. The same gate runs at the infra gate, in Mod mode
 and for balance runs. It is mandatory in every run mode.
 
@@ -145,9 +145,12 @@ looks missing. The `<prefix>meta.txt` lists one `snd`/`sndq` line per sound star
    **Long runs do not pause.** A run longer than 50 s (and every `-Seconds 0` / playtest instance) starts a
    keep-alive (`tools/sim/keepalive.py`): every 25 s a 0.6 s spin of the whole cube about the vertical axis, which the
    engine counts as the cube being handled, so its battery save (60 s idle: the cube dims, a game shows "PAUSED" and
-   stops) never starts; tilt (gravity in cube space) is unchanged. `run_info.json` says `keepalive: true`, pulses are
-   in `<OutDir>/keepalive.log`. A "PAUSED" toast or a dimmed cube in such a run is therefore not expected: the
-   keep-alive did not run (python missing, `-NoKeepAlive`; read its log) - rerun, do not judge those frames. Only a
+   stops) never starts; tilt (gravity in cube space) is unchanged. `run_info.json` says `"keepalive": "starting"` until the first
+   complete pulse (about 25 s in), then `true` (`"failing"` / `"failed"` when pulses fail); pulses are in
+   `<OutDir>/keepalive.log`. A "PAUSED" toast or a dimmed cube in such a run is therefore not expected: the
+   keep-alive did not run (python missing, `-NoKeepAlive`; read its log) - rerun, do not judge those frames.
+   A tap sent during a pulse can come back `err tap_dropped` (a turning cube takes no taps): send it again
+   (`SIM_MCP.md`); it is not a game finding. Only a
    check of battery save itself passes `-NoKeepAlive` / `--no-keepalive` (`simulator/README.md`).
 
    Every run also prints a `seams:` line for its last frame (`tools/sim/seams.py`, also runnable on any
@@ -202,8 +205,11 @@ minor ones are recorded and fixed when cheap. After the fix: build, run, look ag
 
 ## Playtest Agent (interaction)
 
-When the hidden instance's control socket answers (`sim_mcp` is `wire`, `SIM_MCP.md`),
-the Playtest Agent (`cube_verifier`) drives taps, twists and tilts. It never plays the
+The Playtest Agent (`cube_verifier`) drives taps, twists and tilts through the hidden instance's
+control socket (`sim_mcp` is `wire`, `SIM_MCP.md`). When the socket does not answer (step 3's `ping`
+fails), stop that instance by PID and start a fresh one once; still no answer → an environment blocker
+(`RUN_MODES.md`, failure policy 5): the prompt stays open, never passed on the visual gate alone, and the
+run stops with the tool's error. It never plays the
 visual gate's build: there autoplay feeds the inputs and the plane pin overrides the
 tilt, so the agent's own taps, twists and tilts would prove nothing.
 
@@ -234,7 +240,13 @@ tilt, so the agent's own taps, twists and tilts would prove nothing.
    Linux/macOS (as a background shell command too): `bash <skills>/tools/sim/run_hidden.sh <ws>/app_<game> --seconds 1500 --every-ms 0 --mcp-port 8177 --out-dir <ws>/assets_<game>/qa/sim/p03-play`;
    it writes `<out-dir>/run_info.json` at the start (`ends_at`, `pid`) and adds `mcp_port` about a second later (also in
    `<out-dir>/stdout.txt` and `<out-dir>/work/log_linux.txt`: `[mcp] control socket listening on 127.0.0.1:<port>`,
-   `SIM_MCP.md`); the instance ends itself after `--seconds` (pick a lifetime that just covers the playtest; never kill by name).
+   `SIM_MCP.md`); the instance ends itself after `--seconds`.
+   **Linux/macOS limitation:** there is no `stop.sh` and `run_hidden.sh` has no `--allow-early-stop`, so a
+   playtest instance there cannot be stopped early (stopping it by PID ends the run as a failure, and
+   `run_hidden.sh` is its watchdog). Pick a shorter lifetime that just covers the playtest (about 900 s;
+   the context's `playtest_seconds` when it is set lower or the game needs longer), tell the Playtest Agent
+   its `ends_at`, and wait for the instance to end by itself before the next hidden run (one instance at a
+   time). Never kill it by name.
 
 3. Connect through `run_info.json` (Windows): `mcp.ps1 -RunInfo` waits up to 30 s for the port
    (`mcp_port`, written about a second after the start, else the log line) and prints it:
@@ -252,9 +264,9 @@ tilt, so the agent's own taps, twists and tilts would prove nothing.
    the score does not cover the prompt; when the game starts a round at boot, give the
    playtest build a title or a paused start (a test hook) so the agent connects before
    anything is decided.
-5. Stop the instance with `tools\sim\stop.ps1 -RunInfo <out dir>\run_info.json` (it stops only that
+5. Windows: stop the instance with `tools\sim\stop.ps1 -RunInfo <out dir>\run_info.json` (it stops only that
    process: same PID, exe and start time, never a reused PID) as soon as the agent
-   returns, also on failure.
+   returns, also on failure. Linux/macOS: wait for its lifetime to end (step 2).
 
 **Per-module skew in one frame.** The eight modules are threads that are not in lockstep (`simulator/README.md`,
 captures), so one frame can show a HUD value one tick apart on different screens (score 4 on FRONT, 5 on RIGHT) at

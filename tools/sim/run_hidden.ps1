@@ -44,9 +44,11 @@
                            starts tools\sim\keepalive.py once the MCP port is known: every -KeepAliveSec seconds it spins
                            the cube 1080 deg about the vertical axis over ~0.6 s (36 MCP `turn 30 0 0`, one a frame).
                            The engine counts that as sustained movement, so the idle minute that would dim the cube
-                           and PAUSE the game (battery save, OCT_BATSAVE_IDLE_MS = 60 s) never runs out; gravity in
-                           cube space (tilt) does not change. Pass -NoKeepAlive only to test battery save itself.
-                           Pulses are logged to <OutDir>\keepalive.log (an MCP tap inside a pulse may be dropped).
+                           and PAUSE the game (battery save after 60 s idle) never runs out; gravity in cube space
+                           (tilt) does not change. Pass -NoKeepAlive only to test battery save itself. Pulses are
+                           logged to <OutDir>\keepalive.log (an MCP tap inside a pulse may be dropped: send it
+                           again); run_info.json says "keepalive": "starting" until the first complete pulse, then
+                           true ("failing" / "failed": the keep-alive is not working, see its log).
 .PARAMETER KeepAliveSec    Seconds between keep-alive pulses (default 25; the first comes after the same time).
 
 .EXAMPLE
@@ -147,7 +149,8 @@ if ($keepAlive -and -not $py) {
 }
 $kaLog = Join-Path $OutDir 'keepalive.log'
 $info = [ordered]@{ pid = $procId; exe = $Exe; start_time = $procStart; out_dir = $OutDir; work_dir = $WorkDir; log = $logPath; mcp_port = $null; seconds = $Seconds; every_ms = $EveryMs; ends_at = $endsAt;
-                    keepalive = $keepAlive; keepalive_log = $(if ($keepAlive) { $kaLog } else { $null }) }
+                    # "starting" until keepalive.py's first complete pulse sets it to true ("failing" / "failed": see its log)
+                    keepalive = $(if ($keepAlive) { 'starting' } else { $false }); keepalive_log = $(if ($keepAlive) { $kaLog } else { $null }) }
 $infoPath = Join-Path $OutDir 'run_info.json'
 $info | ConvertTo-Json | Set-Content -LiteralPath $infoPath -Encoding utf8
 Write-Host ("started hidden: pid $procId  (stop early: tools\sim\stop.ps1 -RunInfo $infoPath; exit 7 unless " +
@@ -171,14 +174,18 @@ $onPoll = {
         Write-Host "mcp: listening on 127.0.0.1:$($script:mcpPort)  (t=$elapsedMs ms; client: tools\sim\mcp.ps1 -Port $($script:mcpPort) ping)"
         if ($keepAlive) {
             # hidden like the simulator (no console window); it ends itself when the simulator closes the socket
-            $kaArgs = "`"$(Join-Path $PSScriptRoot 'keepalive.py')`" --port $($script:mcpPort) --period $KeepAliveSec --first $KeepAliveSec --log `"$kaLog`""
+            $kaArgs = "`"$(Join-Path $PSScriptRoot 'keepalive.py')`" --port $($script:mcpPort) --period $KeepAliveSec --first $KeepAliveSec --log `"$kaLog`" --run-info `"$infoPath`""
             try {
                 $kaPid = Start-HiddenProcess -Exe $py -WorkDir $OutDir -Arguments $kaArgs
                 $script:kaProc = Get-Process -Id $kaPid -ErrorAction Stop   # taken while the creation handle pins the PID
                 $null = $script:kaProc.Handle
                 [WowcubeHiddenLaunch2]::Release($kaPid)
                 Write-Host "keep-alive: pid $kaPid, a yaw pulse every $KeepAliveSec s (log $kaLog; off: -NoKeepAlive)"
-            } catch { Write-Host "WARNING: keep-alive did not start ($($_.Exception.Message)): the game pauses after 60 s without input" -ForegroundColor Yellow }
+            } catch {
+                Write-Host "WARNING: keep-alive did not start ($($_.Exception.Message)): the game pauses after 60 s without input" -ForegroundColor Yellow
+                $info.keepalive = $false
+                $info | ConvertTo-Json | Set-Content -LiteralPath $infoPath -Encoding utf8
+            }
         }
     }
 }

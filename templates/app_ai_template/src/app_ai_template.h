@@ -6,7 +6,7 @@
 
 
 // =====================================================================================================================
-//  OctaviOS app reference: annotated API + demos. Engine: octavios dev >= 609d5ae (2026-10-21, fw-0.100.6-dev).
+//  OctaviOS app reference: annotated API + demos. Engine: the public game API this plugin ships (api/include, 2026-10-21).
 //  ../API.md is the compact index of every call, limit and rule (read it first); this file shows them in use.
 //  Tap a face to step through the demos (DEMO_0 .. DEMO_20); in demos 17, 18 and 20 a single tap acts on the demo and
 //  a double tap moves on.
@@ -32,7 +32,7 @@
 //   snprintf knows only %d %u %ld %lu %zu %Nd %0Nd %s %c %% (cast to int32_t/uint32_t and use %d/%u).
 // -----------------------------------------------------
 
-// --- CALLBACKS (octavios dev) ------------------------------------------------------------------------------------------
+// --- CALLBACKS ---------------------------------------------------------------------------------------------------------
 // Mandatory, always exported (apps/src/app_module.cpp references all six; the binder refuses a module without
 // on_init/on_tick):
 //   on_init()                 once per launch, inside a tick shared by all 8 modules. OCT_restart FIRST (see on_init),
@@ -554,7 +554,7 @@ void showLabel(appObject_t* label, bool show) {
 }
 
 // Util: copy this code if needed
-// The face that is up, with the engine's own top-change rule (oct_tm.h OCT_TM_face_up_update: the challenger must lead
+// The face that is up, with the engine's own top-change rule (the engine's OCT_TM_face_up_update: the challenger must lead
 // by OCT_TM_TOP_HYSTERESIS 0.29 in gravity_n, ~12 degrees past 45). OCT_TM_top_side() has no hysteresis: between ~45
 // and ~57 degrees it already names the new face while OCT_TM_face_up still holds the old top's latch. This one switches
 // together with that latch (checked in the simulator: 55 degrees keeps it, 60 switches; back at 40 it holds, at 30 it
@@ -1318,8 +1318,8 @@ void processDemo10(void) {
 
 
 // Utils (copy them): place content upright for the player on any face.
-// An "up" angle a (0/90/180/270) is counter-clockwise from the plane's +Y, as OCT_TM_face_up returns it (engine
-// oct_tm.h: U = cos(a)*B3D - sin(a)*T3D), so in plane coordinates up = (-sin a, cos a) and the player's right =
+// An "up" angle a (0/90/180/270) is counter-clockwise from the plane's +Y, as OCT_TM_face_up returns it (the engine's
+// rule: U = cos(a)*B3D - sin(a)*T3D), so in plane coordinates up = (-sin a, cos a) and the player's right =
 // (cos a, sin a). uprightOffset() turns an offset given as the player sees the face (ux to the right, uy up) into
 // plane x,y; the same a is the sprite angle that draws it upright (assign it to Tm.A or pass it to OCT_add).
 static inline void uprightOffset(int32_t a, float ux, float uy, float* x, float* y) {
@@ -2014,7 +2014,7 @@ void processDemo20(void) {
 // Demo: do not copy-paste this code
 void tapDemo20(int32_t tapid) {
     // API info + demo
-    // Comment: octavios dev/test firmware also flashes the struck screen white for 100 ms on every tap (OCT_DEBUG_TAP_FLASH,
+    // Comment: development and test firmware also flashes the struck screen white for 100 ms on every tap (a
     // firmware-side debug aid); release firmware and the bundled simulator do not (simulator/README.md, "Tap indicator").
     int32_t quad = appTapQuad(tapid);
     if (quad >= 0) {

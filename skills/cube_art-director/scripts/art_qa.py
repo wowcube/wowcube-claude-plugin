@@ -65,7 +65,7 @@ def profile_with_original(prof: dict, orig: Path) -> dict | None:
         except SystemExit:
             return None
 
-# check ids: stable names the waivers refer to (references/QA_RULES.md, "Waivers")
+# check ids: stable names the waivers refer to (references/QA_RULES.md, "Numeric FAILs are questions")
 WAIVABLE = {
     "style": "style score vs the anchors' profile (S1)",
     "fill": "canvas coverage `fill` (A5)",
@@ -93,6 +93,39 @@ def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def profile_hash(prof: dict | None) -> str | None:
+    """The style profile's fingerprint (what `art.py style` measured from the anchors): a style waiver is bound
+    to it, so new or changed anchors end the waiver."""
+    if not prof:
+        return None
+    return hashlib.sha256(json.dumps(prof, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def waiver_stale(w: dict, cid: str, final_dir: Path, name: str, *, ref: str | None = None,
+                 prof_hash: str | None = None, hashes: dict | None = None) -> str | None:
+    """Why a waiver no longer holds (None = it holds). It ends when the asset's final image changes; a set
+    waiver also when its reference frame (`ref`: the frame the number is measured against) is another frame
+    or that frame's image changed; a style waiver also when the style profile (the anchors) changed."""
+    hashes = {} if hashes is None else hashes
+
+    def h(n):
+        if n not in hashes:
+            f = final_dir / f"{n}.png"
+            hashes[n] = file_hash(f) if f.exists() else None
+        return hashes[n]
+
+    if w.get("sha256") != h(name):
+        return "the image changed since it was waived"
+    if cid.startswith("set_") and w.get("ref"):
+        if ref is not None and ref != w["ref"]:
+            return f"it is now measured against {ref}, not {w['ref']}"
+        if w.get("ref_sha256") != h(w["ref"]):
+            return f"the reference frame {w['ref']} changed since it was waived"
+    if cid == "style" and w.get("profile_sha256") and prof_hash is not None and w["profile_sha256"] != prof_hash:
+        return "the style profile (the anchors) changed since it was waived"
+    return None
+
+
 def waivers_location(project) -> tuple[Path, bool]:
     """(file, in_spec): an art.json project keeps its waivers in art.json ("qa_waivers"); a WowCube manifest
     (written by the pipeline, validated by build_pipeline.py) keeps them beside fixes.json, in
@@ -104,7 +137,10 @@ def waivers_location(project) -> tuple[Path, bool]:
 
 
 def load_waivers(project) -> dict:
-    """{asset: {check: {"reason", "sha256", "date"}}}"""
+    """{asset: {check: {"reason", "sha256", "date"[, "ref", "ref_sha256"][, "profile_sha256"][, "kind"]}}}
+    `ref` / `ref_sha256`: a set check's reference frame; `profile_sha256`: the style profile a style waiver was
+    given under; `kind: "accepted_under_budget"`: a real failure accepted because the image budget is spent
+    (not a false number)."""
     path, in_spec = waivers_location(project)
     if not path.exists():
         return {}
@@ -143,32 +179,37 @@ def run(project, final_dir: Path, prof: dict | None, keys: dict | None = None,
     results: dict[str, dict] = {}
     in_scope = (lambda n: True) if scope is None else (lambda n: n in scope)
     waivers = load_waivers(project) if waivers is None else waivers
-    hashes: dict[str, str] = {}
+    hashes: dict[str, str | None] = {}
+    prof_hash = profile_hash(prof)
 
-    def waiver_for(name: str, cid: str):
-        """(waiver, stale): a waiver of a waivable check, and whether the image changed since it was given."""
+    def waiver_for(name: str, cid: str, ref: str | None):
+        """(waiver, why it is stale or None): a waiver of a waivable check (waiver_stale says when it ends)."""
         w = (waivers.get(name) or {}).get(cid)
         if not w or cid not in WAIVABLE:
-            return None, False
-        f = final_dir / f"{name}.png"
-        if name not in hashes and f.exists():
-            hashes[name] = file_hash(f)
-        return w, w.get("sha256") != hashes.get(name)
+            return None, None
+        return w, waiver_stale(w, cid, final_dir, name, ref=ref, prof_hash=prof_hash, hashes=hashes)
 
-    def check(name: str, cid: str, ok: bool, msg: str, hard: bool = True):
+    def check(name: str, cid: str, ok: bool, msg: str, hard: bool = True, ref: str | None = None):
         nonlocal fails
         entry = {"id": cid, "ok": ok, "hard": hard, "msg": msg}
-        w, stale = waiver_for(name, cid)
+        if ref is not None:
+            entry["ref"] = ref                    # the frame this set number is measured against (waivers bind it)
+        w, stale = waiver_for(name, cid, ref)
+        under = bool(w) and w.get("kind") == "accepted_under_budget"
         if ok:
             lines.append(f"PASS {name}: {msg} [{cid}]")
             if w and not stale:
-                lines.append(f"INFO {name}: the waiver of {cid} is not needed any more (it passes)")
+                lines.append(f"INFO {name}: the {'acceptance' if under else 'waiver'} of {cid} is not needed any "
+                             f"more (it passes)")
+        elif w and not stale and under:
+            entry.update(hard=False, accepted_under_budget=w.get("reason", ""))
+            lines.append(f"ACCEPTED UNDER BUDGET {name}: {cid} - {w.get('reason', '')} (measured: {msg})")
         elif w and not stale:
             entry.update(hard=False, waived=w.get("reason", ""))
             lines.append(f"WAIVED {name}: {cid} - {w.get('reason', '')} (measured: {msg})")
         else:
             tag = "FAIL" if hard else "WARN"
-            note = (" (its waiver was dropped: the image changed since it was waived - look at it again)"
+            note = (f" (its {'acceptance' if under else 'waiver'} was dropped: {stale} - look at it again)"
                     if w else "")
             lines.append(f"{tag} {name}: {msg} [{cid}]{note}")
             if hard:
@@ -269,19 +310,19 @@ def run(project, final_dir: Path, prof: dict | None, keys: dict | None = None,
                 # fixed_canvas frames are scaled as drawn: their shape and centre change on purpose (a draining
                 # ring, a growing burst), so the numbers are warnings for the reviewer
                 hard = m.colour_lock and not m.fixed_canvas
-                check(m.name, "set_centroid", jit <= CENTROID_JITTER_PX, f"centroid jitter {jit:.2f}px vs {first.name} (max {CENTROID_JITTER_PX})", hard)
+                check(m.name, "set_centroid", jit <= CENTROID_JITTER_PX, f"centroid jitter {jit:.2f}px vs {first.name} (max {CENTROID_JITTER_PX})", hard, ref=first.name)
                 hard = hard and not m.pose_free
                 if ref is not None:
                     _, bb_r, _, area_r, _ = st[ref.name]
                     ar = area / max(area_r, 1)
                     hr = (bb[3] - bb[1]) / max(bb_r[3] - bb_r[1], 1)
-                    check(m.name, "set_area", AREA_RATIO[0] <= ar <= AREA_RATIO[1], f"area ratio {ar:.2f} vs {ref.name}", hard)
-                    check(m.name, "set_height", HEIGHT_RATIO[0] <= hr <= HEIGHT_RATIO[1], f"height ratio {hr:.2f} vs {ref.name}", hard)
+                    check(m.name, "set_area", AREA_RATIO[0] <= ar <= AREA_RATIO[1], f"area ratio {ar:.2f} vs {ref.name}", hard, ref=ref.name)
+                    check(m.name, "set_height", HEIGHT_RATIO[0] <= hr <= HEIGHT_RATIO[1], f"height ratio {hr:.2f} vs {ref.name}", hard, ref=ref.name)
             j = colour_ref(members, members.index(m))
             refm = members[j]
             if j != members.index(m) and refm.name in st:
                 dc = float(np.abs(col - st[refm.name][4]).sum())
-                check(m.name, "set_colour", dc <= COLOUR_DRIFT, f"colour drift {dc:.1f} vs {refm.name} (max {COLOUR_DRIFT})")
+                check(m.name, "set_colour", dc <= COLOUR_DRIFT, f"colour drift {dc:.1f} vs {refm.name} (max {COLOUR_DRIFT})", ref=refm.name)
         anims: dict[str, list] = {}
         for m in live:
             anims.setdefault(m.anim or m.name, []).append(m)
@@ -295,10 +336,14 @@ def run(project, final_dir: Path, prof: dict | None, keys: dict | None = None,
     if arrs:
         _all_sheet(qa / "all.png", [(a.name, arrs[a.name], a.fullsize or max(a.size) > 120) for a in project.assets if a.name in arrs])
     n_waived = sum(1 for r in results.values() for c in r.get("checks", []) if c.get("waived") is not None)
-    lines.append(f"\n{fails} hard failure(s)" + (f", {n_waived} waived check(s)" if n_waived else ""))
+    n_under = sum(1 for r in results.values() for c in r.get("checks", [])
+                  if c.get("accepted_under_budget") is not None)
+    lines.append(f"\n{fails} hard failure(s)" + (f", {n_waived} waived check(s)" if n_waived else "")
+                 + (f", {n_under} accepted under budget" if n_under else ""))
     (qa / "report.txt").write_text("\n".join(lines), encoding="utf-8")
-    (qa / "report.json").write_text(json.dumps({"fails": fails, "waived": n_waived, "profile": bool(prof),
-                                                "assets": results}, indent=1), encoding="utf-8")
+    (qa / "report.json").write_text(json.dumps({"fails": fails, "waived": n_waived, "accepted_under_budget": n_under,
+                                                "profile": bool(prof), "assets": results}, indent=1),
+                                    encoding="utf-8")
     return fails, results
 
 

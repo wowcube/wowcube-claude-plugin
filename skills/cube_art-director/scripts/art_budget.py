@@ -35,9 +35,13 @@ passes, however much is spent.
 
 An animation made from a video (references/ANIMATION_VIDEO.md) is one entry of kind `video` whose
 `count` is the number of frames cut from it: it costs the budget what drawing those frames one by one
-would, so switching routes never changes the budget arithmetic (`art.py budget <spec> --video <anim>`
-records it before the job is submitted). The service's own credits are separate: the user agrees to
-them per run, the entry only notes them (`credits`).
+would, so switching routes never changes the budget arithmetic. The order: `art.py budget <spec>
+--video <anim> --quote` checks that it fits and records nothing; after the user's yes to the quoted
+credits, `art.py budget <spec> --video <anim> --credits C` records it once, right before the job is
+submitted; a job recorded but never submitted is removed with `--drop` (`Ledger.drop_last`, which
+also lowers the context mirror by its count). An approved first frame the clip keeps is not counted.
+The service's own credits are separate: the user agrees to them once per run, the entry only notes
+them (`credits`).
 
 The count: the ledger's entries (an entry may carry `count`, default 1). A context whose
 `spend.images_used` is larger than the ledger (a project that counted before the ledger existed)
@@ -300,7 +304,9 @@ class Ledger:
     def refusal(self, need: int) -> str:
         return (f"image budget: {self.spent} of {self.cap} already spent [{self._cap_source()}] and this run "
                 f"needs {need} more request(s) (retries cost extra). Nothing was drawn. Draw fewer (--only), "
-                f"waive what is left (STAGE3_ASSETS.md §3, 'A budget ends the redraws'), or ask the user: only "
+                f"record the real failures left as accepted under budget (art.py waive --under-budget; "
+                f"STAGE3_ASSETS.md §3, "
+                f"'A budget ends the redraws'), or ask the user: only "
                 f"on their yes raise budget.images in the profile, or rerun with --over-budget.")
 
     def can_afford(self, need: int) -> bool:
@@ -341,6 +347,30 @@ class Ledger:
                                                  "spent": self.spent, "entries": self.entries}, indent=1))
             self._mirror_spent()
             return True, ""
+
+    def drop_last(self, name: str, kind: str) -> dict | None:
+        """Remove the newest entry of `kind` for `name` (a video job recorded but never submitted) and lower the
+        context mirror by its count; the removed entry, or None when there is none. Under the same lock as
+        charge(); only an entry this tool recorded for a job that was never made may be dropped."""
+        with self._tlock, _FileLock(self.lock_path):
+            self.entries = self._load()
+            for i in range(len(self.entries) - 1, -1, -1):
+                e = self.entries[i]
+                if e.get("name") == name and e.get("kind") == kind:
+                    break
+            else:
+                return None
+            gone = self.entries.pop(i)
+            _write_atomic(self.path, json.dumps({"budget": self.budget, "budget_source": self.source,
+                                                 "spent": self.spent, "entries": self.entries}, indent=1))
+            if self.mirror is not None and self.mirror.is_file():
+                ctx = _read(self.mirror)
+                spend = ctx.get("spend") if isinstance(ctx.get("spend"), dict) else {}
+                old = _num(spend.get("images_used")) or 0
+                spend["images_used"] = max(self.spent, old - _count([gone]))
+                ctx["spend"] = spend
+                _write_atomic(self.mirror, json.dumps(ctx, indent=2, ensure_ascii=False))
+            return gone
 
     def _mirror_spent(self) -> None:
         """Copy the count into the context's spend.images_used (never lower), re-reading the context first

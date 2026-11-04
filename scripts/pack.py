@@ -119,7 +119,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                    help='Destination for --emit-raw .raw files '
                         '(default: --packed-dir, where the sim reads packed/*.raw)')
     p.add_argument('--beta-app-dir', default=None,
-                   help='Beta (octavios dev) app root. When set, after the '
+                   help='Beta app root. When set, after the '
                         'legacy pack a beta asset container is emitted there: '
                         'index.bin, art/packed/*.{raw,pal}, launcher icon '
                         'maps, and a kind-aware src/<app-name>_ids.h')
@@ -263,7 +263,7 @@ def _resolve_map_filter(args: argparse.Namespace, pack_bat=None) -> None:
 
     Fallback, when there is no ``!pack.bat``: the ``map_`` filename prefix
     plus the launcher's two reserved map names. ``ico`` is looked up by name
-    by the engine itself (``oct_shell.h``: ``OCT_external_map(..., "ico")``)
+    by the engine's launcher itself (``OCT_external_map(..., "ico")``)
     and ``ahover`` is its hover twin, so ``art/ico.psd``/``art/ahover.psd``
     are maps by contract.
 
@@ -627,7 +627,7 @@ def _load_sprite_pivot_rects_from_psls(
 def _load_sprite_rates_from_psls(exported_dir: str) -> dict[str, int]:
     """Map png_name -> octBmp_t Rate, from the exported Assets/Font PSLs.
 
-    ``Rate`` is the per-frame duration multiplier: ``oct_scene.h`` advances a
+    ``Rate`` is the per-frame duration multiplier: the engine's scene code advances a
     sequence every ``bmp->Rate * spr->FrameRate``, so a sprite that loses it
     plays back at the raw frame rate — 4-10x too fast for ``app_ref_b``'s
     animations. Two independent sources, both carried in the PSL and both
@@ -664,7 +664,7 @@ def _load_font_metrics_from_psls(
 ) -> dict[str, tuple[float, float, float, float]]:
     """Map glyph_name -> (PivotX, PivotY, Bw, Bh) from the exported font PSLs.
 
-    A font glyph is not a sprite: ``oct_scene.h::OCT_label_set`` reads ``Bw``
+    A font glyph is not a sprite: the engine's ``OCT_label_set`` reads ``Bw``
     as the pen advance, ``Bh`` as the line height and ``PivotX`` as the left
     bearing. Left to the sprite defaults every glyph anchors at its own
     bottom-right corner with a zero advance, so a whole label collapses onto
@@ -1064,7 +1064,7 @@ def _phase_emit_beta(
     maps: MapPhaseResult,
     carry: dict | None = None,
 ) -> None:
-    """Emit the beta (octavios dev) asset container into --beta-app-dir.
+    """Emit the beta asset container into --beta-app-dir.
 
     Runs after the legacy outputs are all written; nothing here changes them.
     Palette-sprite payloads are taken from the freshly packed --output-dir

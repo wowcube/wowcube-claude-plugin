@@ -37,7 +37,7 @@
     folder (<ws>\.agent_scratch\pNN\build): the full check (device -Werror + plugin) without touching the app folder.
 .PARAMETER ApiDir
     Maintainers: the header tree to compile against instead of <plugin>\api: a folder with include\ (or engine\),
-    plugin\ and apps\src\ (tools\api\check_api_parity.py passes a sources checkout to compare the two builds).
+    plugin\ and apps\src\ (an API parity check passes a sources checkout to compare the two builds).
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\sim\build_game.ps1 -AppDir C:\ws\app_my_game -Define MYG_DEBUG_AUTOPLAY=1,MYG_MUTE=1

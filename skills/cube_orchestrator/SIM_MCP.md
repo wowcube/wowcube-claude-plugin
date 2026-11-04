@@ -27,7 +27,8 @@ The simulator (`wowcube-sim`, Windows, Linux, macOS) opens a control socket at s
   (`record n ms` gets 15 s + n·ms + n/4 s; `mcp.ps1` waits that long plus 30 s, so one long
   recording never times out in the client first).
 - a second client is normal: for an instance that lives longer than 50 s the wrapper's keep-alive
-  (`tools/sim/keepalive.py`, `run_info.json` `keepalive: true`, log `<OutDir>/keepalive.log`) holds
+  (`tools/sim/keepalive.py`; `run_info.json` `keepalive` is `"starting"`, then `true` after its first complete pulse,
+  `"failing"` / `"failed"` when pulses fail; log `<OutDir>/keepalive.log`) holds
   its own connection and every 25 s sends 36 `turn 30 0 0` (~0.6 s, one a frame: a 1080 deg spin about
   the vertical axis) so the engine never enters battery save (60 s without input: dimmed, "PAUSED").
   Gravity in cube space and the pose after it are unchanged; a `tap` that lands inside a pulse can come
@@ -220,8 +221,8 @@ Short and scripted: every image costs tokens.
   `[gesture] tap dropped: <reason>`, then `[mcp] ok tap ...` with the reply. A `tap fused`
   module/screen that differs from the `[sim] tap` line above it is a simulator fault: report
   it, do not score the game for it. Check the effect in the game with `screens faces`.
-- **Captures after a tap.** octavios dev/test firmware paints the struck screen white for 100 ms
-  after every tap (`OCT_DEBUG_TAP_FLASH`, a debug aid; release firmware has none). The bundled
+- **Captures after a tap.** Development and test firmware paints the struck screen white for 100 ms
+  after every tap (a debug aid, the tap flash; release firmware has none). The bundled
   simulator leaves it out by default (`simulator/README.md`, "Tap indicator"), so `idle`,
   `sleep 150`, `screens faces` after a tap's reply shows what the game drew, never that white.
   Only a simulator whose `--version` line (the context's `sdk.version`) ends in `, tap flash` (`-TapFlash`)

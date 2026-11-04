@@ -216,7 +216,7 @@ def load_palettes(pal_png_path):
 
 class BitReader:
     """
-    Bit-level reader matching the turnover buffer from oct_render.h.
+    Bit-level reader matching the engine's turnover buffer.
     Reads bits from a byte array, LSB-first within each uint32 word.
     """
 

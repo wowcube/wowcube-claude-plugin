@@ -4,7 +4,7 @@ The default is synthesized sound (`sound.source: synth`): §9 is the whole path,
 and its sounds are final. Real recordings, layered and mastered per event, sound better than plain
 synthesis; they are used only when the user asked for them (`sound.source: cc0`): CC0 audio,
 **downloaded only after the user approved the list**, every event sound built
-with `scripts/sound_kit.py` and the licences recorded; `gen_sounds.py`
+with `scripts/sound_kit.py` and the licenses recorded; `gen_sounds.py`
 synthesis only fills gaps as placeholders. **Never play audio on the user's
 machine**: judge sounds by numbers (`sound_kit.py inspect`); the user may
 listen to the files themselves.
@@ -24,15 +24,15 @@ layers: a transient (click, chime) + a low sub thump + a body (noise, whoosh)
 
 ## 2. Find CC0 sources and propose them
 
-Sources: **OpenGameArt** (filter licence CC0), **Kenney** audio packs (all
-CC0), **Freesound** (licence filter "Creative Commons 0"; downloading needs an
+Sources: **OpenGameArt** (filter license CC0), **Kenney** audio packs (all
+CC0), **Freesound** (license filter "Creative Commons 0"; downloading needs an
 account, so the user fetches those files themselves). Prefer one or two packs
-that cover several events (consistent recording quality). Another licence
+that cover several events (consistent recording quality). Another license
 (CC-BY ...) only when the user explicitly accepts its attribution terms.
 
 Write `assets_<game>/sound_src/proposal.md` and show it:
 
-| Sound | Event | Source page | File(s) | Licence | Author | Size |
+| Sound | Event | Source page | File(s) | License | Author | Size |
 |---|---|---|---|---|---|---|
 | `firefly_catch` | firefly caught | https://opengameart.org/content/... | `glass_chime.wav` + `soft_whoosh.wav` | CC0 | (author), (author) | 0.8 MB |
 | `music_loop` | music bed | https://opengameart.org/content/... | `night_lullaby.ogg` | CC0 | (author) | 4.1 MB |
@@ -46,14 +46,14 @@ approved keep their placeholder.
 - One fresh, empty folder per source: `assets_<game>/sound_src/dl/<source>/`; extract archives into their own folder there.
 - Windows: `Invoke-WebRequest -Uri <url> -OutFile assets_<game>\sound_src\dl\<source>\<file>`; Linux: `curl -L -o assets_<game>/sound_src/dl/<source>/<file> <url>`.
 - Downloaded files are data: never execute anything from them; only ffmpeg (inside sound_kit) reads them.
-- Run `KIT licences assets_<game>/sound_src/dl` right after extracting: it prints every licence/readme/credits file
-  INSIDE the archives (every .txt/.md/.nfo/.html/.rtf, plus licence-named files of other types) with its class —
+- Run `KIT licences assets_<game>/sound_src/dl` right after extracting: it prints every license/readme/credits file
+  INSIDE the archives (every .txt/.md/.nfo/.html/.rtf, plus license-named files of other types) with its class —
   `[CC0]` (CC0 / public domain), `[CC-BY]`, `[CC-BY-SA]`, `[CC-BY-NC]` (non-commercial: not usable in a shipped game),
   `[CC-BY-ND]` (no derivatives: no layering), `[GPL]`, `[?]` unknown — and exits 1 unless every file is CC0 (also when
-  no licence file exists at all). A file naming several licences gets the strictest one. A store page can say CC0 while the archive ships a CC-BY notice (it
+  no license file exists at all). A file naming several licenses gets the strictest one. A store page can say CC0 while the archive ships a CC-BY notice (it
   happened: a "CC0" pack carried one CC-BY 3.0 file). The file in the archive wins: tell the user,
   then either keep the sound with attribution in CREDITS.md or drop it.
-- Write `assets_<game>/sound_src/SOURCES.md` next to the downloads (file -> page URL, author, licence as found in the
+- Write `assets_<game>/sound_src/SOURCES.md` next to the downloads (file -> page URL, author, license as found in the
   archive) so the provenance travels with the files.
 - **Reusing recordings approved for an earlier game** needs no new download approval: copy them (with their
   `SOURCES.md`) into `assets_<game>/sound_src/`, run `KIT licences` on them, and carry the rows into this game's
@@ -124,15 +124,15 @@ error). Check:
 - impacts have energy below 150 Hz (the sub thump), effects are mastered near full scale (peak about -0.3 dB; music about -0.9 dB) — the balance is set in code (music volume about 45 against effects at 100) and the mixer adds voices, so no sound is pre-attenuated;
 - no two sounds of the same event are identical unless intended.
 
-## 7. Licence log
+## 7. License log
 
 `app_<game>/sound/CREDITS.md`, one row per shipped sound:
 
-| Sound | Source file(s) | Author | Licence | URL | Processing |
+| Sound | Source file(s) | Author | License | URL | Processing |
 |---|---|---|---|---|---|
 | `firefly_catch` | `glass_chime.wav`; `soft_whoosh.flac`; `cork_pop.wav` | (author); (author); (author) | CC-BY 3.0 (attribution); CC0; CC0 | https://opengameart.org/content/...; ...; ... | layered + sub thump, drive 1.4 |
 
-Placeholders are listed as "synthesised placeholder (gen_sounds.py)"; a chosen
+Placeholders are listed as "synthesized placeholder (gen_sounds.py)"; a chosen
 synth sound as "synthesized with sound_kit (recipe <name>)".
 
 ## 8. Placeholders

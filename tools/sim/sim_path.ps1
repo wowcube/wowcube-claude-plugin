@@ -9,10 +9,10 @@
     folder; every tool runs that one.
 
       Get-SimVersion     the simulator version this plugin needs: sim_version in api\SOURCE (the public game API
-                         and the prebuilt simulator come from one commit of the sources; tests\test_sim_dist.py)
+                         and the prebuilt simulator match one engine version)
       Get-SimDir         the install folder: $env:WOWCUBE_SIM_DIR, else ~\.wowcube\sim\<version>\windows
       Resolve-SimExe     <Get-SimDir>\wowcube-sim.exe (it may be missing: get_sim.ps1). There is no other place:
-                         CI sets WOWCUBE_SIM_DIR
+                         a different folder is set through WOWCUBE_SIM_DIR
       Get-SimExeVersion  "<exe> --version", hidden, 30 s limit: the version line, or $null
       Test-SimExe        the check every tool runs before it relies on the exe: present, answers --version, and its
                          version equals Get-SimVersion. Returns @{ Ok; Exe; Line; Version; Expected; Problem }:

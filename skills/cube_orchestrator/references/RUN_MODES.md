@@ -12,9 +12,9 @@ message to the user in the user's language.
 
 | Mode | How it activates | Behaviour |
 |---|---|---|
-| **Autonomous** | profile `guidance: autonomous` (the built-in default); never asked to confirm, no risk speech | Intake (only what the profile left open), one start line, then the whole pipeline to the verified device `.oct` **within the budget**. Stops at the **style lock** (the one creative checkpoint), for real blockers (below) and when the budget is spent. |
-| **Stepwise** | profile `guidance: guided`, or "stepwise", "step by step", "with checkpoints", "review mode" in the prompt, or "stop and wait" / "pause after each step" mid-run | Every checkpoint in the skill is in force: stage boundaries, the designer interview, the asset batch review, each prompt, each mod change. Nothing advances without an explicit "ok / next". |
-| **`YOLO` token (compat alias)** | The literal token `YOLO` (case-insensitive) in the body of the current prompt, then one short risk confirmation (below) | Autonomous, plus: no intake questions (no concept → the designer invents one; no Codex → the procedural style, drawn in code at final quality) and the style lock is waived (an independent reviewer approves the style frame instead of the user). The budget still applies. |
+| **Autonomous** | profile `guidance: autonomous` (the built-in default); never asked to confirm, no risk speech | Intake (only what the profile left open), one start line, then the whole pipeline to the verified device `.oct` **within the budget**. Exactly two planned stops: the **style lock** (the one creative checkpoint; with the sound list only when sounds are downloaded) and, at the end, the **install-link question** (Stage 5). A clarifying question only when the idea names an existing game ("Interrupts"). Otherwise it stops only for real blockers (below) and when the budget is spent. |
+| **Stepwise** | profile `guidance: guided`, or "stepwise", "step by step", "with checkpoints", "review mode" in the prompt, or "stop and wait" / "pause after each step" mid-run | Stops after every step: stage boundaries, the designer interview, the asset batch review, each prompt, each mod change. Nothing advances without an explicit "ok / next". No install on the cube in between: the install link comes at the end (Stage 5). |
+| **`YOLO` token (compat alias)** | The literal token `YOLO` (case-insensitive) in the body of the current prompt, then one short risk confirmation (below) | Autonomous, plus: no intake questions (no concept → the designer invents one; no Codex → the procedural style, drawn in code at final quality) and the style lock is waived (an independent reviewer approves the style frame instead of the user), so there is no style stop. The install-link question at the end is still asked (it sends the game file to WowCube's servers). The budget still applies. |
 
 `YOLO` activation is literal: no paraphrase or translation counts ("autonomous
 mode", "go autonomous", "just run it to the end", in any language, do not), it is never inferred from tone,
@@ -24,13 +24,14 @@ and a previous prompt's token does not carry over. It removes stops, never check
 language; wait for an explicit "yes", anything else → the default autonomous
 mode):
 
-> YOLO: I'll run to the finished file without stopping. I'll invent the game if the request has none, and I won't show you the art style for approval (an independent reviewer checks it instead). Risk: the result may not be what you wanted and may need rework. YOLO does NOT approve paid APIs or downloads: without Codex the art is drawn in code and the sounds are synthesized. Start? (yes / no)
+> YOLO: I'll run to the finished game without stopping, except one question at the end: whether to make an install link for your phone. I'll invent the game if the request has none, and I won't show you the art style for approval (an independent reviewer checks it instead). Risk: the result may not be what you wanted and may need rework. YOLO does NOT approve paid APIs or downloads: unless you already use ChatGPT's drawing tool here, the art is drawn in code, and the sounds are synthesized. Start? (yes / no)
 
-**Paid image APIs need the user's own explicit opt-in, in every mode, per run.** Neither the
+**Paid services need the user's own explicit opt-in, in every mode, asked once per run.** Neither the
 autonomous mode, `YOLO` (nor its confirmation), nor a provider chosen in the profile implies consent
-to pay: a paid provider (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`,
-`IMAGE_API`, `~/.wowcube/image_api.json`) is used only when the user, in this run, said yes to paying
-per image for this batch; only then set `WOWCUBE_ALLOW_PAID_IMAGES=1` / `--allow-paid`. A key that is
+to pay: a paid image provider (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`,
+`IMAGE_API`, `~/.wowcube/image_api.json`) or a paid video service is used only when the user, in this
+run, said yes to the quoted cost. Ask once per run with the cost (for images: the price per image times
+the images the run may draw, up to the image budget), never per batch; only then set `WOWCUBE_ALLOW_PAID_IMAGES=1` / `--allow-paid`. A key that is
 merely configured is not consent. A local Stable Diffusion server on this machine (`http://localhost`
 / `127.0.0.1`) costs nothing and needs no opt-in.
 
@@ -71,9 +72,17 @@ defined there; the block from `technical_prompter` Step 5a) is done in minutes, 
    the tunables block, nothing else; anything more is a coder task) or one small coder call;
 3. build the plugin (it runs the ARM `-Werror` device check too) and ONE hidden visual-gate run, look at
    the frames, delete them;
-4. update the GDD's tunables table, record it in the context (`balance_passes` when it is balance), and
+4. **a short playtest when the value changes how the game plays** (a speed, a timing, a count of
+   enemies or lives, a difficulty number) and the tier playtests `polish` prompts (`lite`, `full`: the
+   playtest row above; Mod mode M5 counts a T1 number change as `polish`): one Playtest Agent run
+   focused on the changed value only (does the new number feel as asked, nothing else moved), on the
+   playtest build (`VISUAL_GATE.md`, "Playtest Agent"). A purely visual value (a colour, the size of a
+   decoration) and the `standard` tier get none;
+5. update the GDD's tunables table, record it in the context (`balance_passes` when it is balance), and
    rebuild the device `.oct` (`repack_app.py`: minor version bump) when the user will install it.
-No code reviewer, no playtest unless the user asks for one. Target: a couple of minutes.
+No code reviewer (only literal values changed, and the build checks them); a playtest only as in step 4 or
+when the user asks for one. Target: a few minutes for a visual value, about 10–15 minutes with the
+playtest.
 
 ## History and undo
 
@@ -109,13 +118,17 @@ These decide whether the result runs on the cube; no mode, tier or budget suspen
 - `_ids.h` is never hand-edited; a partial asset set is never packed:
   `build_pipeline.py pack` refuses it before writing anything.
 - Art is packed only when every rule in `cube_art-director/references/QA_RULES.md`
-  passes, or a spent image budget waived a style rule on the record (STAGE3_ASSETS.md §3);
-  placeholder art (`art.source: placeholder`, only on request) is never presented as final; the
-  procedural style is final art.
+  passes, or is waived (`art.py waive`) after a look at the picture showed the FAIL is false, or is
+  accepted under a spent image budget on the record (`accepted_under_budget`; STAGE3_ASSETS.md §3);
+  the art is never presented as final when it is temporary (the context's `art_source: placeholder`,
+  only on request); the procedural style (`art_source: procedural`) is final art.
 - Downloads only after the user approved the list (the `YOLO` waiver is not an approval of downloads).
-- Paid image APIs only after the user's explicit opt-in in this run (`--allow-paid`).
+- Paid image APIs and paid video services only after the user's explicit opt-in in this run, asked once
+  with the cost (`--allow-paid` for images).
 - Material leaves the machine only as the profile's `data_policy` allows (prompts and references to
-  Codex or a provider; nothing when the list is empty).
+  Codex or a provider; nothing when the list is empty). The image-to-video route needs
+  `animation_frames` in `data_policy.may_leave_machine` (the base picture and the motion description go
+  to the service) and never runs under `may_leave_machine: []`.
 - The deliverable is the Stage 5 device `.oct` with verified ARM code, in `dist/`;
   never a simulator-written `.oct`.
 - `references/AGENT_SAFETY.md`, for you and in every subagent brief.
@@ -159,31 +172,46 @@ mechanic (a rule of play), **whatever its category**: a `ui` prompt that adds "t
 `polish` prompt that changes how a twist moves the hero is playtested in `standard` too. The
 prompt says so itself (`### Input or mechanic change`, `technical_prompter` Step 5); when that line is
 missing, read the Goal and Verification: any input or rule of play named there counts as a change.
-Mods use the same table (orchestrator SKILL.md, M5: a mod's type maps to a category). The playtest needs the hidden instance's control socket; without it the visual gate carries the
-prompt and the report says nobody drove the game. The profile's `budget.images` and
-`budget.fix_rounds` override the table.
+Mods use the same table (orchestrator SKILL.md, M5: a mod's type maps to a category). The playtest needs
+the hidden instance's control socket. When it does not answer (`mcp.ps1 -RunInfo ... ping` fails), stop
+that instance by PID and start a fresh hidden one once; still no answer → an environment blocker
+(failure policy 5: the prompt stays open, recorded in `not_checked_visually` with the reason "playtest:
+no control socket", save, stop with the tool's error). A prompt the tier playtests never passes on the
+visual gate alone. The profile's `budget.images` and `budget.fix_rounds` override the table.
 
 ## Estimate (the start line and the setup summary)
 
-Measured on real runs (the `lite` rows are estimates built on the old `lite` measurements, labelled so), whole runs including setup checks, art drawn in code, the device `.oct`. Compute the
-estimate from the **planned number of prompts** (`plans/<game>_prompts.md`; before Stage 2, from the game's
-size: a simple game is 1-2 prompts in `lite`, a small game 4-8 in `full`), never from a fixed count,
-and say it is an estimate.
+Every number below is an **estimate** for the next run; the rows marked *measured* come from one real run
+each, the others are built from older measurements and say so. A row covers the **whole run**: setup checks,
+design, the art drawn in code **and the tier's art reviews**, the code, every check, the device `.oct`. Compute
+the estimate from the **planned number of prompts** (`plans/<game>_prompts.md`; before Stage 2, from the
+game's size: a simple game is 1-2 prompts in `lite`, a small game 4-8 in `full`), never from a fixed count,
+and say it is an estimate. Tokens are the **total** (subagents and the main session) unless a cell says
+"subagents" (then add about 10% for the main session).
 
-| Measured run | Time | Tokens |
+| Estimate for | Time | Tokens |
 |---|---|---|
-| `lite`, a 1-prompt simple game | estimate: about 30–45 min (old lite, one reviewer: ~17 min measured, release 2.4.0) | estimate: about 1M (old lite: ~0.6M subagents) |
-| `lite`, a new small game (2 prompts, art in code) | estimate: about 1.5–2.5 h (old lite, one reviewer and a playtest only on the last prompt: ~1 h 40 min measured in a QA run) | estimate: about 1.5M subagent tokens, about 2M with the main session (old lite: ~1.2M subagents measured) |
+| `lite`, a 1-prompt simple game | estimate: about 45–75 min (old lite with one reviewer and lighter art reviews: ~17 min measured, release 2.4.0; now two reviewers, a playtest and two fresh art reviews) | estimate: about 1M in total (old lite: ~0.6M subagents) |
+| `lite`, a new small game (2 prompts, art in code) | estimate: about 1.5–2.5 h (old lite, one reviewer and a playtest only on the last prompt: ~1 h 40 min measured in a QA run) | estimate: about 1.5–2M in total (old lite: ~1.2M subagents measured) |
 | `standard`, a studio game, 8 prompts | ~2 h 15 min | ~3.5M (subagents) |
-| `standard`, one single-feature mod | ~25 min | ~0.85M |
-| `full`, one foundation prompt with one fix round | ~1.5 h | ~2M (subagents) |
-| a light-lane tunable change | a few minutes | well under 0.1M |
+| `full`, one foundation prompt with one fix round | measured: ~1.5 h | ~2M (subagents) |
+| a light-lane tunable change | a few minutes; about 10–15 min with its playtest | well under 0.1M; about 0.2M with its playtest |
 
-Per prompt, for the formula: `lite` a 1-prompt game, setup and delivery included, about 30–45 min and
-about 1M tokens, and each further prompt about 45–75 min and about 0.5–1M tokens (two reviewers and a
-playtest per prompt; estimates, the new `lite` is not measured yet); `standard` ~17 min and ~0.45M subagent
-tokens plus ~10% for the main session; `full` ~1.5 h and ~2M. Art adds about 2-4 min per Codex picture
-(about a minute per picture drawn in code) and ~45 min for the fresh art reviews (`lite`: ~15 min).
+The formula (it reproduces the rows):
+- `lite`: the first prompt, with setup, the art drawn in code, its two fresh art reviews and delivery,
+  about 45–75 min and about 1M tokens; each further prompt about 45–75 min and about 0.5–1M tokens (two
+  reviewers, a playtest, up to two fix rounds). 2 prompts: about 1.5–2.5 h, about 1.5–2M. Not measured
+  yet for the current `lite`.
+- `standard`: ~17 min and ~0.45M subagent tokens per prompt, plus ~10% for the main session (the
+  measured 8-prompt run divided by 8: setup and art are spread over it).
+- `full`: ~1.5 h and ~2M subagent tokens per prompt.
+- **Art beyond the rows**: the rows assume art drawn in code (about a minute per picture) and the
+  tier's fresh art reviews. Codex art adds about 1-3 min per picture on top (2-4 min each instead of
+  about one; pictures = the manifest's sprites plus redraws, capped by the image budget). The fresh art
+  reviews are already in the rows; measured: three fresh reviews of 9 sprites took ~42 min and ~580k
+  tokens (STAGE3_ASSETS.md §3), so about 12–15 min and ~0.2M per review: `lite` (2) about 25–30 min,
+  `standard` (3) about 40–45 min, `full` (5) about 60–75 min, more for a large set.
+- *Art only* (`entry: art`) is just the art part: the pictures and the tier's reviews, no code.
 
 Never name, invent or guess subscription plans. Say the time and the tokens; when the user has told you
 their subscription and its weekly limit in tokens or as they know it, add roughly what share of that limit
@@ -194,7 +222,7 @@ the run takes; for the real number point them to their usage page ("Cost questio
 - **"How much will it cost / is it free?"** It runs on the AI the user already has (their Claude
   subscription or API key): no extra charge from this kit. It uses tokens: "about N million tokens by my
   estimate" (the table above). Drawing in code and synthesized sound cost nothing more; an outside image
-  service is used only if the user picked it themselves (a paid one asks before every batch).
+  service is used only if the user picked it themselves (a paid one asks once per run, with the cost).
 - **"How much of my plan is that?"** Only if they tell you their plan and its limit: "roughly X% of a
   weekly limit". Never guess a plan. The real usage is on their Claude usage page (Claude Code: `/usage`;
   claude.ai: Settings > Usage; an API key: the Anthropic Console).
@@ -205,19 +233,19 @@ the run takes; for the real number point them to their usage page ("Cost questio
   work. If they chose an outside tool (ChatGPT/Codex, an image service), that provider's own data
   settings apply to what was sent to it.
 
-Add the art: about 2-4 min per image (images = the manifest's sprites plus redraws, capped by the image
-budget), and ~45 min for the fresh art reviews. *Art only* (`entry: art`) is just this part: the pictures
-and the reviews, no code (drawn in code: about a minute per picture, no image budget spent).
+**Mods** are estimated per change, not per prompt. The rows are different jobs, not the tiers compared:
+the first change to a game brought in from outside pays for the import (M0) once.
 
-**Mods** are estimated per change, not per prompt:
-
-| Mod | `lite` | `standard` / `full` |
+| Mod (scenario) | Time | Tokens |
 |---|---|---|
-| One change (M0 import incl. art extraction, the change, its gates, the repack and the device `.oct`) | estimate: about 1–1.5 h, about 1.2M subagent tokens (old lite with one reviewer measured ~1 h, ~1M: one sprite change on a game delivered without art sources; now two reviewers and a playtest) | `standard`: ~25 min, ~0.85M tokens (~0.6M subagent + ~0.25M main session; measured 2026-11-03: a fork adding one small feature with three code-drawn sprites, Claude only, art drawn in code; one fresh art review, no fix round). `full`: not measured |
+| First change to an imported game, `lite`: M0 import incl. art extraction (a game delivered without art sources), one sprite change, its gates, the repack and the device `.oct` | estimate: about 1–1.5 h (old lite with one reviewer measured ~1 h; now two reviewers and a playtest) | estimate: about 1.2M subagents |
+| One small feature on a fork, `standard`: three code-drawn sprites, one fresh art review, no fix round | measured 2026-11-03: ~25 min, ~0.85M tokens (~0.6M subagent + ~0.25M main session; Claude only, art drawn in code) | see Time |
+| The same small feature, `lite` | estimate: about 35–50 min (adds a playtest and a second fresh art review) | estimate: about 1–1.2M in total |
 | Each further change in the same run | less: the import, the baseline frames and the extraction are done once | |
 
-A tunable change (speed, timing, a count) goes through the light lane: a few minutes. A T4 structural
-change is estimated like new prompts (the mini-plan says how many).
+`full` mods are not measured: estimate them like one `full` prompt. A tunable change (speed, timing, a
+count) goes through the light lane (the table above). A T4 structural change is estimated like new prompts
+(the mini-plan says how many).
 
 ## Intake (once, before going quiet)
 
@@ -237,8 +265,9 @@ options (AskUserQuestion), never a wall of text. No profile yet → `wowcube-set
 
 Not a question but a blocker, reported at intake when the entry checks find it: the bundled simulator
 or build kit is missing or older than the pipeline needs, or the toolchain is incomplete. Send the
-exact fix once (SKILL.md, entry check 3); design, prompts, art and sound continue; the run waits before
-the infra gate until the user says it is done.
+exact fix once (SKILL.md, entry check 3), named to the user as "the components for building and checking
+the game" (never "simulator", "build kit" or "toolchain"); design, prompts, art and sound continue; the run
+waits before the infra gate until the user says it is done.
 
 "I don't know", "you choose", "skip setup", "just do it", or no answer to a question: take the defaults
 and go on autonomously: the AI the user came with (Claude), the art drawn in code, the sounds synthesized,
@@ -252,17 +281,18 @@ pay). The environment blocker still applies.
 **Start line** (autonomous; in the user's language, plain words), printed once, then continue without
 waiting for a reply:
 
-> Making your game for the cube. I'll stop once to show you how it will look, then go on my own to the finished game. Estimate: about 30–45 minutes and about 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
+> Making your game for the cube. I'll stop to show you how it will look, and at the end to ask about the install link; the rest I do on my own. Estimate: about 45–75 minutes and about 1 million tokens of your AI usage. If your usage limit runs out, everything is saved and we continue later. Want to approve each step? Say "step by step".
 
 Fill the estimate from the table above, the profile's tier and the planned number of prompts (before
-Stage 2, from the game's size: "Estimate"). Guided runs give the same estimate in their first message.
+Stage 2, from the game's size: "Estimate"). Guided runs give the same estimate in their first message. A
+`YOLO` run says only the install-link stop ("I'll ask you one thing at the end: the install link").
 
 ## Plain language (the default for everyone)
 
 Plain words for every user until they show otherwise (they use the technical words themselves, say they
 are a developer, or `experience: cpp`). Talk about the game, not the machinery. Never say "manifest",
 "stage", "verifier", "prompt", "gate", "rescope", "subagent", "tier", "pack", "playtest", "Playtest Agent", "reviewer", "agent", "GDD", ".oct", "CC0",
-"Codex", "PSD", "simulator", "toolchain", "compiler", "SDK", "plugin", "winget", "pip", "repository",
+"Codex", "PSD", "simulator", "store", "toolchain", "compiler", "SDK", "plugin", "winget", "pip", "repository",
 "API", "token" (except in a cost answer), "build kit", "reconfigure" (say "change my settings"). Say
 instead: "the list of pictures and sounds", "step", "the checks", "a part of the game", "simplify",
 "helper", "the code check", "the screen check", "the automatic gameplay check", "the game's description", "the game file", "free sounds anyone may use", "ChatGPT's drawing
@@ -285,7 +315,7 @@ When a term has to appear (a file name, the user asked), explain it once in a fe
 | tokens | how AI usage is counted; a subscription allows a certain amount per week |
 | the automatic checks | the computer plays every version of the game and looks at all 24 screens (never "the simulator") |
 | QR code | a square code the phone camera reads; it opens the link that installs the game |
-| style lock | the one stop where the user approves how the game looks before everything is drawn |
+| style lock | the stop where the user approves how the game looks before everything is drawn (with the install-link question at the end, one of the two planned stops of *On my own*) |
 
 ## What each mode does at each checkpoint
 
@@ -302,10 +332,10 @@ When a term has to appear (a file name, the user asked), explain it once in a fe
 | Fix rounds used up | Ask: simplify / try again / stop | Rescope if `scope_cuts: auto` and the rescope budget allows, else stop with a report |
 | Budget spent | Save, ask: more budget / simplify / stop | Save, stop with the report |
 | Mod mini-plan, per-change check | Present, STOP | Auto-approved, mods back-to-back; a structural change (T4) always stops ("Interrupts") |
-| Store upload and install QR code (Stage 5) | Ask once, then upload | Ask once ("Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"), then upload; the run's only other stop |
+| Store upload and install QR code (Stage 5) | Ask once, then upload | Ask once ("Make an install link and a QR code so you can put the game on your cube from your phone? (The game file is sent to WowCube's servers for that.)"), then upload; the second planned stop (also in `YOLO`) |
 
 **Real blockers** that stop autonomous mode: the environment (simulator, build kit, toolchain; the ARM
-toolchain from the infra gate on, since every build's device check needs it, CMake and Ninja at Stage 5; a hidden simulator that stops working mid-run, failure policy 5), the Codex login when the profile wants Codex art, a spent run budget (not the image budget), and a game whose simplest
+toolchain from the infra gate on, since every build's device check needs it, CMake and Ninja at Stage 5; a hidden simulator that stops working mid-run, or a playtest instance whose control socket still does not answer after one restart, failure policy 5), the Codex login when the profile wants Codex art, a spent run budget (not the image budget), and a game whose simplest
 playable loop still fails the gates.
 
 ## Safe parallelism (Stage 4)
@@ -355,7 +385,8 @@ the context (`fix_rounds` per prompt, `rescopes_used`, `images_used`, the time s
 4. **Art rule that genuinely cannot be met** (after real changes to prompt, references and processing)
    → simplify the asset within its manifest entry (same name and size) until QA passes, record it;
    when the image budget is spent, STAGE3_ASSETS.md §3 decides.
-5. **Visual gate unavailable** (the hidden tool itself broke, not the game) → try to fix the tool; if
+5. **Visual gate or playtest unavailable** (the hidden tool itself broke, not the game; a playtest
+   instance whose control socket does not answer after one restart, "Verification tiers") → try to fix the tool; if
    that fails, the prompt stays open (never passed): record it in `not_checked_visually`, save the
    context and stop with the tool's error; guided and autonomous alike (a real blocker, below). After
    the tool is repaired, the gate runs again on the same prompt and its code; the next coder starts
@@ -373,7 +404,7 @@ language, plain words (see "Plain language"): "design done → drawing the art (
 The final report (autonomous; also the end of a stepwise run), plain language. Stage 5 writes it to
 `context/<game>_report.md` (overwritten at every delivery) and shows it in the chat:
 
-1. **Install it**: the QR code (`dist/app_<game>_qr.png`) and the link from the store upload, with one
+1. **Install it**: the QR code (`dist/app_<game>_qr.png`) and the install link (`delivery.store.url`), with one
    line: "Scan the QR code with your phone (or open the link on it): the WowCube app installs the game on
    the cube connected to the phone." The version, and the game file `dist/app_<game>.oct`. Not uploaded
    (the user said no) → say that the game is ready and the QR code comes with "upload it".
@@ -382,8 +413,8 @@ The final report (autonomous; also the end of a stepwise run), plain language. S
    the real cube).
 3. **What was cut or simplified** — every item, one line each; a prompt waiting for the visual gate
    (`not_checked_visually`); what the budget stopped, and how to resume ("say 'continue'").
-4. **Temporary parts**, one line each when they apply: "The art is temporary: log in to
-   Codex (`codex login`) and say 'redraw the art'."; "The sounds are synthesized: say
+4. **Temporary parts**, one line each when they apply: "The pictures are temporary: sign in to
+   ChatGPT's drawing tool on this computer (I'll give you the one command) and say 'redraw the art'."; "The sounds are synthesized: say
    'find real sounds'." (only when recordings were the plan); "You did not approve the style: say so
    if you want another one." The procedural style and a chosen `sound.source: synth` are not
    temporary: say they were made in code on purpose.
@@ -419,7 +450,7 @@ run no `check_env`, no build, no check, and do not rewrite the context or the pr
   playtest findings) and leads with what the agent could not judge, so the user's
   time goes to feel, difficulty, sound and pacing.
 - The hidden test copy of the cube is an internal checking tool: never offer it to the user as a way to
-  play. To try the game, the user installs it on their cube (Stage 5's QR code; a mid-run install needs a
-  device build, `repack_app.py`, and a store upload with their yes).
+  play. There is no install on the cube between steps: the cube install comes at the end (Stage 5's
+  install link and QR code).
 - Long builds: suggest one stage, or one batch of prompts, per session. Everything
   resumes from the files (`plans/`, `assets_<game>/`, `context/`).

@@ -7,11 +7,11 @@
 # tool runs that one.
 #   sim_os               linux | macos
 #   sim_version          the simulator version this plugin needs: sim_version in api/SOURCE (the public game API and
-#                        the prebuilt simulator come from one commit of the sources; tests/test_sim_dist.py)
+#                        the prebuilt simulator match one engine version)
 #   sim_dir              the install folder: $WOWCUBE_SIM_DIR, else ~/.wowcube/sim/<version>/<os>
-#   sim_exe              <sim_dir>/wowcube-sim (it may be missing: get_sim.sh). There is no other place: CI sets
-#                        WOWCUBE_SIM_DIR
-#   sim_tool <name>      a file next to the exe (spptest)
+#   sim_exe              <sim_dir>/wowcube-sim (it may be missing: get_sim.sh). There is no other place: a different
+#                        folder is set through WOWCUBE_SIM_DIR
+#   sim_tool <name>      a file next to the exe
 #   sim_exe_version <exe>  "<exe> --version" with a 30 s limit: prints the version line, non-zero when it does not answer
 #   sim_check [<exe>]    the check every tool runs before it relies on the exe: present, answers --version, and its
 #                        version equals sim_version. 0 = ok (prints the version line); 1 = not usable (prints what is

@@ -19,6 +19,8 @@ reviewers all get it, verbatim:
   the hidden instance on the port it was given, through its control socket.
 - Stop only processes you started yourself, by PID. Never kill by name or pattern.
 - No commits, pushes, PRs or messages; no credentials or API keys; no downloads.
+- Never call a paid service or an MCP connector that spends money (an image or video
+  service) unless this brief says the user agreed to it for this run.
 - Write only the files listed in files_to_write (reviewers write nothing), plus throw-away
   files in the scratch folder you were given (compile checks, notes); nothing else.
 ```
@@ -36,8 +38,8 @@ reviewers all get it, verbatim:
   "verification_criteria": "<what must be visible / must happen>",
   "platform_reminders": ["..."],
   "standing_rules": ["<lines from context/rules.md that apply>"],
-  "profile": {"guidance": "autonomous", "experience": "cpp", "verification": "standard",
-              "art": {"source": "codex", "provider": null}, "data_policy": {"may_leave_machine": ["prompts"]}},
+  "profile": {"guidance": "autonomous", "experience": "new", "verification": "lite",
+              "art": {"source": "procedural", "provider": null}, "data_policy": {"may_leave_machine": []}},
   "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE"},
   "asset_facts": {"music_loop_ticks": 309},
   "files_to_read": [
@@ -93,8 +95,8 @@ A prompt that adds saves or an optional callback also lists
   "prior_context": [],
   "test_hooks": {"autoplay": "<GAME>_DEBUG_AUTOPLAY", "mute": "<GAME>_MUTE", "plane_pin": "<GAME>_DEBUG_PLAYFIELD_FACE"},
   "mod_request": null,
-  "profile": {"guidance": "autonomous", "experience": "cpp", "verification": "standard",
-              "art": {"source": "codex", "provider": null}, "data_policy": {"may_leave_machine": ["prompts"]}},
+  "profile": {"guidance": "autonomous", "experience": "new", "verification": "lite",
+              "art": {"source": "procedural", "provider": null}, "data_policy": {"may_leave_machine": []}},
   "frames_dir": "<ws>/assets_<game>/qa/sim/p03-1",
   "playtest_port": 8177,
   "ends_at": "2026-11-02T10:45:00Z",
@@ -127,8 +129,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skills>\tools\sim\build_gam
 
 Exit 0 = `BUILD OK`; else the first errors are printed (logs in `<OutDir>/obj/`). Never hand-written
 compiler lines, never an engine, SDK or octavios folder outside `<skills>/simulator/` (the only engine
-the pipeline builds against). No compiler on the machine → say so in `notes`; the orchestrator's
-visual gate build is the check then. The orchestrator fills `compile_check` with the real paths. `recheck` is set from the second check round on:
+the pipeline builds against). No compiler on the machine, or the ARM toolchain missing (`compile_check` fails before compiling) →
+stop and reply `"status": "error"` with the build output: a missing toolchain is an environment
+blocker (RUN_MODES.md, failure policy and "Real blockers"), never worked around, and the visual gate's
+build needs the same toolchain. The orchestrator fills `compile_check` with the real paths. `recheck` is set from the second check round on:
 `{"previous_report": "<ws>/context/reports/p03_requirements_r1.json", "diff": "<ws>/context/reports/p03_fix_r1.diff"}`
 (the agent's own last report and the fixer's unified diff of the game files; the
 orchestrator writes both). The agent then re-checks narrowly (`cube_verifier`, "Re-check
@@ -290,23 +294,23 @@ run. **This block is the one definition of the context's fields**; every other f
   "game": "<game>",
   "run_mode": "autonomous|stepwise",
   "profile": {"resolved_at": "2026-11-02T10:00", "entry": "new", "role": "developer",
-              "guidance": "autonomous", "experience": "cpp", "verification": "standard",
-              "budget": {"usage": "normal", "hours": null, "images": 80, "fix_rounds": 3,
-                         "rescopes": 3, "scope_cuts": "ask"},
-              "art": {"source": "codex", "provider": null}, "sound": {"source": "cc0"},
-              "data_policy": {"may_leave_machine": ["prompts"]}},
+              "guidance": "autonomous", "experience": "new", "verification": "lite",
+              "budget": {"usage": "normal", "hours": null, "images": 30, "fix_rounds": 2,
+                         "rescopes": 2, "scope_cuts": "ask"},
+              "art": {"source": "procedural", "provider": null, "animation": "frames"},
+              "sound": {"source": "synth"}, "data_policy": {"may_leave_machine": []}},
   "import": {"from": "<source path>", "mode": "update|fork", "app_dir": "app_<game>", "date": "2026-11-02",
              "rights": "yes|unsure", "art_extracted": "assets_<game>/extracted.json",
              "identity": {"guid1": "0x...", "title": "...", "version": "0.0.0",
                           "fork_of": {"app_dir": "app_<old>", "guid1": "0x..."}}},
-  "spend": {"started": "2026-11-02T10:05", "images_used": 34, "rescopes_used": 0},
-  "art_budget": {"images": 80, "minutes": null},
+  "spend": {"started": "2026-11-02T10:05", "images_used": 0, "rescopes_used": 0},
+  "art_budget": {"images": 30, "minutes": null},
   "sdk": {"simulator": "~/.wowcube/sim/<version>/<os>/wowcube-sim", "version": "<wowcube-sim --version line>",
           "check_env": "ok"},
   "infra": "ok",
   "style_lock": {"status": "pending|approved|waived|user_art", "anchors": ["assets_<game>/style/anchors/hero_idle_00.png"], "date": "2026-10-28"},
-  "art_source": "codex|own|procedural|provider|placeholder|original",
-  "sound": {"source": "cc0|synth", "music_loop_ticks": 309, "credits": "app_<game>/sound/CREDITS.md"},
+  "art_source": "procedural|codex|own|provider|placeholder|original",
+  "sound": {"source": "synth|cc0", "music_loop_ticks": 309, "credits": "app_<game>/sound/CREDITS.md"},
   "test_hooks": {"autoplay": "FF_DEBUG_AUTOPLAY", "mute": "FF_MUTE", "plane_pin": "FF_DEBUG_PLAYFIELD_FACE"},
   "sim_mcp": "wire|absent",
   "playtest_port": 8177,
@@ -319,16 +323,19 @@ run. **This block is the one definition of the context's fields**; every other f
      "functions_added": ["initGame"], "globals_changed": [], "sprites_used": 24,
      "scores": {"requirements": 97, "template": 95, "playtest": 92},
      "visual_gate": {"verdict": "pass", "frames": "assets_<game>/qa/sim/p01-2", "findings": []},
-     "fix_rounds": 1, "notes": "black backdrop on all faces"}
+     "fix_rounds": 1, "notes": "black backdrop on all faces", "request": null}
   ],
   "cuts": [],
-  "accepted_majors": [{"prompt": 3, "finding": "...", "reason": "..."}],
+  "accepted_majors": [{"prompt": 3, "finding": "...", "reason": "..."},
+                      {"asset": "hero_walk_02", "finding": "...", "reason": "review budget spent"}],
   "accepted_minors": [{"asset": "glow_ring_03", "finding": "..."}],
+  "accepted_under_budget": [{"asset": "hero_walk_02", "check": "style", "finding": "...",
+                             "via": "art.py waive|@style_exempt|@colour_exempt|@pose_exempt|@fill"}],
   "not_checked_visually": [],
-  "delivery": {"oct": "dist/app_<game>.oct", "builder": "python|octpack", "version": "1.0.3",
+  "delivery": {"oct": "dist/app_<game>.oct", "builder": "python|octpack", "version": "0.2.0",
                "store_consent": "2026-10-28",
                "store": {"url": "https://store.wowcube.com/uploads/<id>?password=<pw>",
-                         "qr": "dist/app_<game>_qr.png", "date": "2026-10-28T23:10", "version": "1.0.3",
+                         "qr": "dist/app_<game>_qr.png", "date": "2026-10-28T23:10", "version": "0.2.0",
                          "sha256": "..."},
                "report": "context/<game>_report.md"},
   "balance_passes": [],
@@ -342,6 +349,17 @@ run. **This block is the one definition of the context's fields**; every other f
   "Resolved snapshot": the project file's shape with every limit filled); `spend` counts against
   `profile.budget` (RUN_MODES.md, failure policy). `run_mode` is rewritten at every entry by the one
   rule in RUN_MODES.md (request, else `profile.guidance`).
+- `prompts[].request` is the user's own words for a change (Mod mode: recorded at M2, copied into the
+  verification brief's `mod_request`); `null` for a prompt of a new game.
+- `accepted_majors` has one shape for every source: `{"prompt"?, "asset"?, "finding", "reason"}`:
+  `prompt` (the prompt number) for a code or gameplay finding, `asset` (the sprite name) for an art
+  finding, at least one of them; `finding` is the finding's text, `reason` why it stays open (e.g.
+  "review budget spent"). Criticals are never accepted.
+- `accepted_under_budget` lists every art QA FAIL left when the image budget was spent
+  (STAGE3_ASSETS.md §3): `asset` (a sprite, or the class an exemption covers), `check` (the QA check id),
+  `finding` (what the picture shows), `via` (`art.py waive`, or the `fixes.json` exemption used). It is
+  distinct from a false FAIL waived after a look (`art.py waive` with an ordinary reason, recorded in
+  `qa_waivers.json`, not here). The final report lists both kinds separately.
 - `art_source` is what the art really is (it falls back to `procedural` when the asked source cannot
   draw); `profile.art.source` is what the profile asked for.
 - `import` exists only for a game that came in through Mod mode M0; its presence means M0 is done.
@@ -363,6 +381,6 @@ run. **This block is the one definition of the context's fields**; every other f
   (Stage 3); there is no top-level `music_loop_ticks`. A coding brief copies it into its
   `asset_facts.music_loop_ticks`.
 - `playtest_seconds` is the playtest instance's `-Seconds` lifetime (default 1500 when absent; raise it
-  for a long game). `spend.images_used` is written by the image ledger (`art.py` / the paid path,
+  for a long game; Linux/macOS, where an instance cannot be stopped early: about 900, `VISUAL_GATE.md`). `spend.images_used` is written by the image ledger (`art.py` / the paid path,
   `cube_art-director/scripts/art_budget.py`: `context/<game>_images.json` holds every request), never
   counted by hand.

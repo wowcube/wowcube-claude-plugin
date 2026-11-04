@@ -4,11 +4,11 @@
 
 .DESCRIPTION
     1. The plugin carries the prebuilt simulator: simulator\dist\<version>\windows\wowcube-sim.exe, described by
-       simulator\dist\<version>\manifest.txt (written by tools\sim\stage_dist.py from the CI build of the private
-       simulator sources). <version> is the one this plugin needs (sim_version in api\SOURCE: the public game API and
-       the simulator come from one commit of the sources). No git, no network, no compiler.
+       simulator\dist\<version>\manifest.txt (the release build of the simulator). <version> is the one this
+       plugin needs (sim_version in api\SOURCE: the public game API and the simulator match one engine version). No
+       git, no network, no compiler.
     2. The exe's sha256 must match the manifest; a staged copy must answer "wowcube-sim.exe --version" (started
-       hidden, killed by PID after 30 s) with that version and the manifest's build commit. Only then it
+       hidden, killed by PID after 30 s) with that version and the manifest's build id. Only then it
        replaces <sim dir>\wowcube-sim.exe: ~\.wowcube\sim\<version>\windows (or $env:WOWCUBE_SIM_DIR), outside the
        plugin folder, which may be read-only or replaced on an update (tools\sim\sim_path.ps1).
     3. There is no other way to get it: the plugin ships no simulator sources, so a missing or damaged prebuilt

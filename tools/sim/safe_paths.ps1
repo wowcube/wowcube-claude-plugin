@@ -1,4 +1,4 @@
-# Path guards shared by tools\sim\run_hidden.ps1 and tools\cube_upload\run_upload.ps1.
+# Path guards of the hidden-run tools (tools\sim\run_hidden.ps1).
 # Dot-source it:  . (Join-Path $PSScriptRoot 'safe_paths.ps1')
 #
 #   $why = Test-UnsafeWorkDir -WorkDir <dir> -Protect @($AppDir, $Octavios, $Telemetry)

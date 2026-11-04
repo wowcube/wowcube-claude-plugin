@@ -16,7 +16,7 @@
 # syntax only, so a game that would not build for the cube fails here. g++ plugins also get -fsingle-precision-constant
 # (the cube's float semantics); clang has no such flag (unsuffixed literals are double there), see simulator/README.md.
 # --api-dir (maintainers): compile against another header tree (include/ or engine/, plugin/, apps/src/) instead of
-# <plugin>/api: tools/api/check_api_parity.py passes a sources checkout to compare the two builds.
+# <plugin>/api: an API parity check passes a sources checkout to compare the two builds.
 # Source rules (tools/sim/game_lint.py, always): an unsuffixed floating literal (0.5, not 0.5f) fails the build - the
 # cube reads it as float, clang as double; --allow-double-literals skips that rule for old games. Static constructors
 # (__attribute__((constructor)), init_priority) are refused: they may run before the plugin's imports are bound.

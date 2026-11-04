@@ -1,11 +1,13 @@
 # Source
 
-Author: Alex Poshivalov (WowCube). Adapted for this pipeline.
+Contributed by the WowCube team. Adapted for this pipeline.
 
 ## Changes made here
 
-- `references/example-maze_box.html`: links `common/cube.css` and `common/cube.js`, the layout SKILL.md
-  prescribes, instead of `../assets/`.
+- The full example page of an earlier game was removed (examples stay genre-neutral); SKILL.md describes the
+  page structure and shows a neutral autopilot script.
+- The gesture is called **tap** everywhere (pages, legends, captions); `onTap` is accepted as the name of the
+  tap callback (`onPat` still works).
 - SKILL.md "Where to put it": pipeline games use `plans/<game>_prototype.html` + `plans/common/` (as
   `cube_game-designer` Step 5), an existing game repository keeps `docs/`; autonomous runs build one only when
   the brief asks.

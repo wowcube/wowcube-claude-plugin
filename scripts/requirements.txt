@@ -1,5 +1,5 @@
 # Exact pins on purpose: the packer's output is compared byte-for-byte against
-# the reference toolchain (tests/golden/, tests/test_pivot_parity.py), and a quantiser or
+# the reference toolchain (golden files in the development repository's tests), and a quantiser or
 # PNG-decoder change in a dependency moves those bytes. Bump deliberately, in
 # a commit that re-runs the parity measurements.
 # Needs Python 3.11+: numpy 2.4 has no wheels or support for 3.10 (README says the same).

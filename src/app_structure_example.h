@@ -4,7 +4,7 @@
 
 #include "app_ai_template_ids.h" // the Stage 4 copy command renames this to app_<game>_ids.h (orchestrator Stage 4, Step 1)
 
-// Skeleton of a game header, src/app_<game>.h, for octavios dev >= 609d5ae.
+// Skeleton of a game header, src/app_<game>.h, for the current app layout.
 // src/app.h includes src/app_metadata.h FIRST (version, APP_GUID1, title, categories, APP_HAS_* switches, the save
 // area via app_save.h) and then this file. Engine facts, limits and pitfalls: templates/app_ai_template/API.md.
 // Annotated examples of every call: templates/app_ai_template/src/app_ai_template.h.

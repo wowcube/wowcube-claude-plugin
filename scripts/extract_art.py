@@ -249,7 +249,7 @@ def _expand565(t: np.ndarray) -> np.ndarray:
 
 def decode_raw(blob: bytes, hdr) -> tuple[np.ndarray, str]:
     """(h, w, 4) RGBA of a raw (OCT_FLAG_RAW565) sprite in any of the engine's sub-formats, as the engine draws
-    it (oct_render.h OCT_RENDER_raw565); raises ValueError on an unknown sub-format rather than guessing."""
+    it (the engine's OCT_RENDER_raw565); raises ValueError on an unknown sub-format rather than guessing."""
     w, h = hdr.w, hdr.h
     fmt = hdr.compression & 0xFF
     body = blob[pb.BMP_SIZE:]

@@ -9,7 +9,7 @@
       then scripts\pack_beta.py --build-oct. It stamps SaveSize from APP_SAVE_SIZE reached through
       src/app_metadata.h (sizeof(record) read from the static_assert of its wire size in app_save.h), like
       octpack-build's host probe. Needs cmake, ninja, arm-none-eabi-g++, python.
-    Builder "octpack" (only with -OctaviOS <an octavios dev checkout>): the SDK's one-command build
+    Builder "octpack" (only with -OctaviOS <an OctaviOS SDK checkout>): the SDK's one-command build
         uv run --frozen --project <octavios>\octpacker octpack-build <AppDir> --out <Out> --engine <octavios>
       (compiles src\app_metadata.h for the header fields, packs art\octpack.json if the app has one, builds the
       ARM module, writes the .oct). Needs uv, Python 3.12 (uv-managed), clang++ (or g++), cmake, ninja,
@@ -19,7 +19,7 @@
       version / GUID / categories / save size == the app's defines (src\app.h -> app_metadata.h -> app_save.h),
       the launcher map "ico", assets == index.bin. The header comes from octpack-info when it runs, otherwise
       from a local read; any mismatch, or anything that cannot be checked, fails the build (exit 1).
-    The deliverable lives in dist\ (the standalone simulator writes no .oct; an older baked-in build or octavios dev
+    The deliverable lives in dist\ (the standalone simulator writes no .oct; an older baked-in build or SDK
     simulator rewrote <app>\<app>.oct on every launch, so a stray one there is never the deliverable).
 
 .PARAMETER AppDir    The app_<game> folder (one *.target; packed: index.bin + art\packed).
@@ -89,7 +89,7 @@ if ($NoUv) { Write-Host "    NOTE: -NoUv / WOWCUBE_NO_UV: uv is not started (pyt
 $octpackReady = (Test-Path (Join-Path $octpackProject 'pyproject.toml')) -and $useUv -and (Test-Path $metadata)
 if ($Builder -eq 'auto') { $Builder = $(if ($octpackReady) { 'octpack' } else { 'python' }) }
 if ($Builder -eq 'octpack' -and -not $octpackReady) {
-    Fail ("octpack-build needs -OctaviOS <octavios dev checkout> (octpacker\pyproject.toml), uv on PATH (and no -NoUv) and " +
+    Fail ("octpack-build needs -OctaviOS <OctaviOS SDK checkout> (octpacker\pyproject.toml), uv on PATH (and no -NoUv) and " +
           "src\app_metadata.h; the default -Builder python needs none of them")
 }
 

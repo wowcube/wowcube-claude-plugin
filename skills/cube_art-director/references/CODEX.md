@@ -33,8 +33,8 @@ once ... save the PNG as <name>.png in the current directory". The output is
 | The reference itself is returned or edited | reference in the work dir | refs attached with `-i` from outside the work dir; prompt forbids returning them |
 | A person appears inside an effect sprite | the style anchor's content leaks | prompt says "copy ONLY the style"; add an explicit "no characters" fix for effect assets |
 | Pink character keyed out in holes | magenta backdrop vs pink subject | green key (`key: green`, or automatic when the prompt/palette is pink) |
-| Glass / gaps become transparent | key colour visible through holes | describe them as dark/solid in the prompt |
-| Frames of one character drift in colour | separate generations | `colour_lock` (matched to the set's first frame) |
+| Glass / gaps become transparent | key color visible through holes | describe them as dark/solid in the prompt |
+| Frames of one character drift in color | separate generations | `colour_lock` (matched to the set's first frame) |
 | Cost of a long batch | one image per call, minutes each | `--jobs 3` in parallel; regenerate only failures (`--only`) |
 
 ## Consulting Codex as a second opinion
