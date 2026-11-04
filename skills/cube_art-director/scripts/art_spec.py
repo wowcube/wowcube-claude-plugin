@@ -106,6 +106,7 @@ class Project:
     panoramas: dict = field(default_factory=dict)   # {name: {size, grid: [cols, rows], pieces, gen_prompt}}
     style_text: str | None = None    # cube manifest `_style`: seeds STYLE.md's Prompt block
     target: str = "wowcube"          # art.json "target": where the art is used; sizes are checked for the cube only
+    spec: Path | None = None         # the file the project was loaded from (art.json or the cube manifest)
 
     def get(self, name: str) -> Asset:
         for a in self.assets:
@@ -141,7 +142,9 @@ def load_project(path: str | Path, workspace: str | Path | None = None) -> Proje
     path = Path(path).resolve()
     data = read_json(path)
     if "sprites" in data:
-        return _from_cube_manifest(path, data, workspace)
+        p = _from_cube_manifest(path, data, workspace)
+        p.spec = path
+        return p
     root = path.parent
     style = data.get("style", {})
     d = data.get("defaults", {})
@@ -164,7 +167,7 @@ def load_project(path: str | Path, workspace: str | Path | None = None) -> Proje
                    bible=(root / style["bible"]) if style.get("bible") else None,
                    anchors=[root / p for p in style.get("anchors", [])],
                    assets=assets, kind="art", workspace=ws.resolve(),
-                   target=str(data.get("target") or "wowcube"))
+                   target=str(data.get("target") or "wowcube"), spec=path)
 
 
 def _from_cube_manifest(path: Path, data: dict, workspace) -> Project:

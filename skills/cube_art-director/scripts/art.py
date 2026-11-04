@@ -26,6 +26,13 @@
                                                     (a modded game's own sprites) are copied byte-exact
                                                     from their original, never refitted
   python art.py qa       <spec> [--only a,b] [--set s]   checks + style scores; exit 1 on hard failures
+  python art.py waive    <spec> --only a[,b] --check style[,set_area] --reason "<what the picture shows>"
+                                                    a numeric FAIL that a look at the picture shows is false:
+                                                    qa reports it WAIVED and does not count it while the
+                                                    final image is unchanged (its hash is stored); waivable
+                                                    checks: style, fill, set_centroid, set_area, set_height,
+                                                    set_colour (never size, key, alpha, cut-out, missing,
+                                                    empty, kept-file checks); --drop removes; no --only lists
   python art.py review   <spec>                     <workspace>/review.html for the artist
   python art.py feedback <spec> --file fb.json      fold the page's "Copy feedback" JSON into fixes.json
   python art.py all      <spec> [gen options]       gen -> process -> qa -> review
@@ -876,6 +883,56 @@ def cmd_qa(args) -> int:
     return 1 if fails else 0
 
 
+def cmd_waive(args) -> int:
+    """Record (or with --drop remove) a waiver: a numeric QA check that a look at the picture showed to be false
+    for this asset. Bound to the final image's hash: redraw or reprocess it and the check counts again."""
+    import datetime
+    p, _ = load(args)
+    waivers = art_qa.load_waivers(p)
+    if not args.only:
+        if not waivers:
+            print("no waivers")
+        for name, checks in sorted(waivers.items()):
+            for cid, w in sorted(checks.items()):
+                f = final_dir(p) / f"{name}.png"
+                live = f.exists() and art_qa.file_hash(f) == w.get("sha256")
+                print(f"{name}: {cid} - {w.get('reason', '')}" + ("" if live else "   (STALE: the image changed)"))
+        return 0
+    checks = [c.strip() for c in (args.check or "").split(",") if c.strip()]
+    if not checks:
+        raise SystemExit("waive needs --check <id>[,<id>] (waivable: " + ", ".join(art_qa.WAIVABLE) + ")")
+    for c in checks:
+        if c in art_qa.UNWAIVABLE:
+            raise SystemExit(f"waive: '{c}' ({art_qa.UNWAIVABLE[c]}) is a technical check and cannot be waived: "
+                             f"fix it (process, the key, the size). Waivable: {', '.join(art_qa.WAIVABLE)}")
+        if c not in art_qa.WAIVABLE:
+            raise SystemExit(f"waive: unknown check '{c}' (waivable: {', '.join(art_qa.WAIVABLE)})")
+    assets = pick(p, args.only, None)
+    if not args.drop:
+        reason = (args.reason or "").strip()
+        if not reason or "\n" in reason:
+            raise SystemExit('waive needs --reason "<one line: what you saw in the picture>"')
+    for a in assets:
+        f = final_dir(p) / f"{a.name}.png"
+        if args.drop:
+            for c in checks:
+                (waivers.get(a.name) or {}).pop(c, None)
+            continue
+        if a.keep:
+            raise SystemExit(f"waive: {a.name} is kept (`keep`): only technical checks apply to it")
+        if not f.exists():
+            raise SystemExit(f"waive: {a.name} has no final image (run process, look at it, then waive)")
+        for c in checks:
+            waivers.setdefault(a.name, {})[c] = {"reason": reason, "sha256": art_qa.file_hash(f),
+                                                 "date": datetime.date.today().isoformat()}
+    where = art_qa.save_waivers(p, waivers)
+    verb = "dropped" if args.drop else "waived"
+    print(f"{verb}: {', '.join(a.name for a in assets)}: {', '.join(checks)} -> {where}")
+    if not args.drop:
+        print("  holds while the final image is unchanged; run qa again")
+    return 0
+
+
 def cmd_sizes(args) -> int:
     """The size guide; with a spec, every asset's size against its role (exit 1 when one cannot work)."""
     print(art_sizes.GUIDE)
@@ -1134,7 +1191,7 @@ def cmd_all(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["doctor", "init", "candidates", "style", "anchor", "gen", "process", "qa",
-                                    "review", "feedback", "all", "budget", "sheet", "sizes", "slice"])
+                                    "review", "feedback", "all", "budget", "sheet", "sizes", "slice", "waive"])
     ap.add_argument("spec", nargs="?", default="")
     ap.add_argument("--workspace", default=None)
     ap.add_argument("--only", default=None)
@@ -1172,6 +1229,10 @@ def main(argv=None) -> int:
     ap.add_argument("--names", default=None, help="slice: names for the sprites, in reading order, comma-separated")
     ap.add_argument("--margin", type=int, default=0, help="slice: pixels around the whole grid")
     ap.add_argument("--out", default=None, help="slice: output folder (default: <sheet folder>/sliced)")
+    ap.add_argument("--check", default=None, help="waive: check id(s), comma-separated (style, fill, set_centroid, "
+                                                  "set_area, set_height, set_colour)")
+    ap.add_argument("--reason", default=None, help="waive: one line - what the picture shows (why the number is wrong)")
+    ap.add_argument("--drop", action="store_true", help="waive: remove the waiver instead")
     ap.add_argument("--no-codex", action="store_true",
                     help="doctor: the art is drawn in code or is the artist's own: Codex is not needed "
                          "(its lines become notes, not failures)")
@@ -1181,7 +1242,7 @@ def main(argv=None) -> int:
     cmd = {"doctor": cmd_doctor, "init": cmd_init, "candidates": cmd_candidates, "style": cmd_style,
            "anchor": cmd_anchor, "gen": cmd_gen, "process": cmd_process, "qa": cmd_qa, "review": cmd_review,
            "feedback": cmd_feedback, "all": cmd_all, "budget": cmd_budget, "sheet": cmd_sheet,
-           "sizes": cmd_sizes, "slice": cmd_slice}[args.cmd]
+           "sizes": cmd_sizes, "slice": cmd_slice, "waive": cmd_waive}[args.cmd]
     try:
         return cmd(args)
     except art_budget.BudgetError as e:     # a refused --budget raise (4), a context that does not parse (2)

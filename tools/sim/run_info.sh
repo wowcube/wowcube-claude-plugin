@@ -10,6 +10,7 @@
 #   ri_write <path>            writes the file atomically (temp + mv) from the RI_* variables:
 #       RI_PID RI_EXE RI_START RI_OUT RI_WORK RI_LOG RI_MCP_PORT RI_SECONDS RI_EVERY_MS RI_ENDS_AT RI_RUN_ID
 #       [RI_EXIT RI_ENDED]     (an empty RI_MCP_PORT / RI_ENDS_AT is null; an empty RI_EXIT leaves exit out)
+#       [RI_KEEPALIVE RI_KEEPALIVE_LOG]  keepalive: 1 = true, else false; its log (empty = null)
 
 ri_iso_utc() {
     if [ $# -eq 0 ]; then date -u +%Y-%m-%dT%H:%M:%SZ; return; fi
@@ -58,6 +59,8 @@ ri_write() {
         printf '  "seconds": %s,\n' "$(ri_json_num "${RI_SECONDS:-}")"
         printf '  "every_ms": %s,\n' "$(ri_json_num "${RI_EVERY_MS:-}")"
         printf '  "ends_at": %s,\n' "$(ri_json_opt_str "${RI_ENDS_AT:-}")"
+        if [ "${RI_KEEPALIVE:-0}" = 1 ]; then printf '  "keepalive": true,\n'; else printf '  "keepalive": false,\n'; fi
+        printf '  "keepalive_log": %s,\n' "$(ri_json_opt_str "${RI_KEEPALIVE_LOG:-}")"
         if [ -n "${RI_EXIT:-}" ]; then
             printf '  "exit": %s,\n' "$(ri_json_str "$RI_EXIT")"
             printf '  "ended_at": %s,\n' "$(ri_json_opt_str "${RI_ENDED:-}")"

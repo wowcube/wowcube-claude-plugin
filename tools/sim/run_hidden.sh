@@ -3,6 +3,7 @@
 #
 #   tools/sim/run_hidden.sh <app_dir> [--seconds 15] [--every-ms 500] [--face -1] [--mcp-port 8177]
 #                           [--out-dir <dir>] [--work-dir <dir>] [--fresh-saves] [--allow-drops] [--exe <wowcube-sim>]
+#                           [--no-keepalive] [--keepalive-sec 25]
 #
 # Starts the installed simulator (sim_path.sh sim_exe; refused unless sim_check finds the version this checkout
 # needs; --exe <path> skips that check) --headless --mute --game <app_dir> --seconds S [--frames <out>/frames ...]
@@ -25,11 +26,17 @@
 # A completed run: exit 0, sim_summary.txt of THIS run (--run-id), completed=1, ok=1, elapsed >= --seconds, as many
 # PNGs on disk as the summary reports written, every one decoding (tools/sim/check_frames.py) and (unless
 # --allow-drops) exactly ceil(seconds*1000 / every-ms) of them; each run writes into a fresh --out-dir (default).
+# Keep-alive: a run longer than 50 s (or --seconds 0) starts tools/sim/keepalive.py once the MCP port is known. Every
+# --keepalive-sec seconds it spins the cube 1080 deg about the vertical axis (36 MCP `turn 30 0 0`, one a frame, ~0.6 s):
+# sustained movement for the engine, so the idle minute that dims the cube and PAUSES the game (battery save) never
+# runs out, while gravity in cube space (tilt) is unchanged. --no-keepalive only to test battery save itself. Pulses
+# are logged to <out-dir>/keepalive.log (an MCP tap landing inside a pulse may be dropped: retry it).
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 APP_DIR=''; SECONDS_RUN=15; EVERY_MS=500; FACE=-1; MCP_PORT=8177; OUT=''; WORK=''; FRESH=0; EXE=''; ALLOW_DROPS=0
+KEEPALIVE=1; KEEPALIVE_SEC=25
 fail() { printf 'ERROR: %s\n' "$2" >&2; exit "$1"; }
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -42,7 +49,9 @@ while [ $# -gt 0 ]; do
         --fresh-saves) FRESH=1; shift;;
         --allow-drops) ALLOW_DROPS=1; shift;;
         --exe)         EXE="$2"; shift 2;;
-        -h|--help)     sed -n '2,26p' "$0"; exit 0;;
+        --no-keepalive) KEEPALIVE=0; shift;;
+        --keepalive-sec) KEEPALIVE_SEC="$2"; shift 2;;
+        -h|--help)     sed -n '2,33p' "$0"; exit 0;;
         -*)            fail 1 "unknown argument: $1";;
         *)             APP_DIR="$1"; shift;;
     esac
@@ -82,6 +91,16 @@ PY=python3; command -v python3 >/dev/null 2>&1 || PY=python
 [ "$EVERY_MS" -le 0 ] || command -v "$PY" >/dev/null 2>&1 || fail 1 "python not found: every frame is checked with tools/sim/check_frames.py"
 
 command -v setsid >/dev/null 2>&1 || [ "$os" = macos ] || fail 1 "setsid not found (util-linux)"
+# battery-save keep-alive (keepalive.py): runs longer than 50 s or until stopped, unless --no-keepalive
+if [ "$KEEPALIVE" -eq 1 ] && { [ "$SECONDS_RUN" -eq 0 ] || [ "$SECONDS_RUN" -gt 50 ]; }; then
+    if ! command -v "$PY" >/dev/null 2>&1; then
+        echo "WARNING: python not found - no keep-alive: the game pauses (battery save) after 60 s without input" >&2
+        KEEPALIVE=0
+    fi
+else
+    KEEPALIVE=0
+fi
+KA_PID=''; KA_LOG="$OUT/keepalive.log"
 if [ "$os" = linux ]; then
     command -v xvfb-run >/dev/null 2>&1 || fail 1 "xvfb-run not found (apt install xvfb): a hidden run needs a virtual display"
     echo "==> Hidden run: xvfb-run $EXE ${args[*]}"
@@ -97,7 +116,8 @@ PGID=$!
 # run_info.json now, while the instance runs (a playtest reads ends_at and mcp_port from it)
 RI_PID="$PGID"; RI_EXE="$EXE"; RI_START="$(ri_iso_utc)"; RI_OUT="$OUT"; RI_WORK="$WORK"; RI_LOG="$WORK/log_linux.txt"
 RI_MCP_PORT=''; RI_SECONDS="$SECONDS_RUN"; RI_EVERY_MS="$EVERY_MS"; RI_ENDS_AT="$(ri_ends_at "$SECONDS_RUN")"
-RI_RUN_ID="$RUN_ID"; RI_EXIT=''; RI_ENDED=''
+RI_RUN_ID="$RUN_ID"; RI_EXIT=''; RI_ENDED=''; RI_KEEPALIVE="$KEEPALIVE"; RI_KEEPALIVE_LOG=''
+[ "$KEEPALIVE" -eq 1 ] && RI_KEEPALIVE_LOG="$KA_LOG"
 ri_write "$OUT/run_info.json"
 echo "started hidden: pid $PGID  run info: $OUT/run_info.json (ends_at ${RI_ENDS_AT:-never})"
 limit=$((SECONDS_RUN + 40)); waited=0; code=''
@@ -107,6 +127,13 @@ while kill -0 "$PGID" 2>/dev/null; do
         if [ -n "$RI_MCP_PORT" ]; then
             ri_write "$OUT/run_info.json"
             echo "mcp: listening on 127.0.0.1:$RI_MCP_PORT"
+            if [ "$KEEPALIVE" -eq 1 ]; then
+                # ends itself when the simulator closes the socket; stopped below otherwise (only this PID)
+                "$PY" "$here/keepalive.py" --port "$RI_MCP_PORT" --period "$KEEPALIVE_SEC" --first "$KEEPALIVE_SEC" \
+                    --log "$KA_LOG" > /dev/null 2>&1 &
+                KA_PID=$!
+                echo "keep-alive: pid $KA_PID, a yaw pulse every $KEEPALIVE_SEC s (log $KA_LOG; off: --no-keepalive)"
+            fi
         fi
     fi
     if [ "$waited" -ge $((limit * 10)) ]; then
@@ -117,6 +144,13 @@ while kill -0 "$PGID" 2>/dev/null; do
     sleep 0.1; waited=$((waited + 1))
 done
 if [ -z "$code" ]; then wait "$PGID"; code=$?; fi
+if [ -n "$KA_PID" ]; then
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+        kill -0 "$KA_PID" 2>/dev/null || break; sleep 0.1
+    done
+    kill -TERM "$KA_PID" 2>/dev/null; wait "$KA_PID" 2>/dev/null
+    [ -f "$KA_LOG" ] && sed 's/^/  /' "$KA_LOG"
+fi
 [ -n "$RI_MCP_PORT" ] || RI_MCP_PORT="$(ri_mcp_port "$OUT/stdout.txt")"
 RI_EXIT="$code"; RI_ENDED="$(ri_iso_utc)"
 ri_write "$OUT/run_info.json"

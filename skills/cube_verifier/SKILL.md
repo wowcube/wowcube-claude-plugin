@@ -429,6 +429,23 @@ reading 12/24 on one screen next to 13/24 on the next. Check the next frame: if 
 capture timing, not a finding; the same mismatch in two consecutive frames is a real bug
 (`cube_orchestrator/references/VISUAL_GATE.md`, "Per-module skew in one frame").
 
+**Drawn by the checker, not the game (ignore; `simulator/README.md`, "What the frame dump draws"):**
+- the grey `#282828` (40,40,40) lines and fields: the dump's 4 px gaps between the 4 screens of a face, 12 px
+  between faces and the empty corners of the cross (the cube's bezels are not in the picture);
+- a 2 px pink line on one side of a bright shape and a 2 px cyan one on the other, on every screen and every
+  app (the template too): the engine draws at 120×120, doubles to 240×240 and takes each pixel pair's red from
+  the previous pixel ("shift red" in its output stage), so red sits 2 px off green/blue along the screen's own
+  rows (horizontal on some screens of the net, vertical on others). Edges step in 2 px for the same reason.
+
+A real defect instead: a fringe or halo also in the source sprite (`assets_<game>/qa/all.png`), one in a key
+colour (magenta/green), one wider than 2 px or all round a shape (V5); a thin line of the game's own
+background colour along inner screen edges (the `seams:` line; V1).
+
+**PAUSED / dimmed in a hidden run is not expected:** `run_hidden` keeps runs over 50 s out of battery save
+(the engine's 60 s idle pause) with a keep-alive (`<out>/keepalive.log`; `run_info.json` `keepalive: true`).
+A "PAUSED" toast or a dimmed cube then means the keep-alive did not run (python missing, `-NoKeepAlive`, its
+log): rerun; it is a game finding only when the game pauses itself.
+
 ### Prompt Template (fresh reviewer)
 
 ```
@@ -450,6 +467,8 @@ hidden simulator run. You only read files; you start nothing.
 5. Report only what the frames show; sound, feel and balance are out of scope
 6. Values one tick apart on neighbouring screens (12/24 next to 13/24) in one frame are capture
    timing, not a bug, when the next frame agrees
+7. Ignore what the checker draws: the grey gap lines between screens and faces, and the 2 px pink/cyan
+   edge pairs (the engine's red shift); a fringe that is also in the source art is a finding
 
 ## Response
 Return ONLY this JSON:

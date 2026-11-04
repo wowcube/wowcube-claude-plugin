@@ -40,6 +40,14 @@
 .PARAMETER AllowStale      Run even when a file in src\ is newer than the plugin (assets are read at every start).
 .PARAMETER AllowDrops      Accept frame slots the simulator skipped or dropped (a stall, slow disk): the frames on disk
                            are still all decoded, but their count is not held to the schedule.
+.PARAMETER NoKeepAlive     Switch the battery-save keep-alive off. By default a run longer than 50 s (or -Seconds 0)
+                           starts tools\sim\keepalive.py once the MCP port is known: every -KeepAliveSec seconds it spins
+                           the cube 1080 deg about the vertical axis over ~0.6 s (36 MCP `turn 30 0 0`, one a frame).
+                           The engine counts that as sustained movement, so the idle minute that would dim the cube
+                           and PAUSE the game (battery save, OCT_BATSAVE_IDLE_MS = 60 s) never runs out; gravity in
+                           cube space (tilt) does not change. Pass -NoKeepAlive only to test battery save itself.
+                           Pulses are logged to <OutDir>\keepalive.log (an MCP tap inside a pulse may be dropped).
+.PARAMETER KeepAliveSec    Seconds between keep-alive pulses (default 25; the first comes after the same time).
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\sim\run_hidden.ps1 -AppDir C:\ws\app_my_game -Seconds 20 -EveryMs 1000
@@ -57,7 +65,9 @@ param(
     [switch] $FreshSaves,
     [switch] $AllowEarlyStop,
     [switch] $AllowStale,
-    [switch] $AllowDrops
+    [switch] $AllowDrops,
+    [switch] $NoKeepAlive,
+    [int] $KeepAliveSec = 25
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'hidden_launch.ps1')
@@ -129,7 +139,15 @@ try { $procStart = (Get-Process -Id $procId -ErrorAction Stop).StartTime.ToUnive
 "pid=$procId exe=$Exe started=$(Get-Date -Format o) process_start=$procStart mcp_port_requested=$McpPort" | Out-File $visLog -Encoding utf8
 # ends_at: when the instance closes itself (a playtest brief carries it: the agent must finish before it)
 $endsAt = if ($Seconds -gt 0) { (Get-Date).ToUniversalTime().AddSeconds($Seconds).ToString('o') } else { $null }
-$info = [ordered]@{ pid = $procId; exe = $Exe; start_time = $procStart; out_dir = $OutDir; work_dir = $WorkDir; log = $logPath; mcp_port = $null; seconds = $Seconds; every_ms = $EveryMs; ends_at = $endsAt }
+# battery-save keep-alive (keepalive.py): runs longer than 50 s or until stopped, unless -NoKeepAlive
+$keepAlive = (-not $NoKeepAlive) -and ($Seconds -eq 0 -or $Seconds -gt 50)
+if ($keepAlive -and -not $py) {
+    Write-Host "WARNING: python not found - no keep-alive: the game pauses (battery save) after 60 s without input" -ForegroundColor Yellow
+    $keepAlive = $false
+}
+$kaLog = Join-Path $OutDir 'keepalive.log'
+$info = [ordered]@{ pid = $procId; exe = $Exe; start_time = $procStart; out_dir = $OutDir; work_dir = $WorkDir; log = $logPath; mcp_port = $null; seconds = $Seconds; every_ms = $EveryMs; ends_at = $endsAt;
+                    keepalive = $keepAlive; keepalive_log = $(if ($keepAlive) { $kaLog } else { $null }) }
 $infoPath = Join-Path $OutDir 'run_info.json'
 $info | ConvertTo-Json | Set-Content -LiteralPath $infoPath -Encoding utf8
 Write-Host ("started hidden: pid $procId  (stop early: tools\sim\stop.ps1 -RunInfo $infoPath; exit 7 unless " +
@@ -137,6 +155,7 @@ Write-Host ("started hidden: pid $procId  (stop early: tools\sim\stop.ps1 -RunIn
 
 # --- watch: visibility every 50 ms; learn the MCP port from the log ---------------
 $script:mcpPort = $null
+$script:kaProc = $null
 $onPoll = {
     param($elapsedMs)
     if ($script:mcpPort -or -not (Test-Path $logPath)) { return }
@@ -150,10 +169,26 @@ $onPoll = {
         $info.mcp_port = $script:mcpPort
         $info | ConvertTo-Json | Set-Content -LiteralPath $infoPath -Encoding utf8
         Write-Host "mcp: listening on 127.0.0.1:$($script:mcpPort)  (t=$elapsedMs ms; client: tools\sim\mcp.ps1 -Port $($script:mcpPort) ping)"
+        if ($keepAlive) {
+            # hidden like the simulator (no console window); it ends itself when the simulator closes the socket
+            $kaArgs = "`"$(Join-Path $PSScriptRoot 'keepalive.py')`" --port $($script:mcpPort) --period $KeepAliveSec --first $KeepAliveSec --log `"$kaLog`""
+            try {
+                $kaPid = Start-HiddenProcess -Exe $py -WorkDir $OutDir -Arguments $kaArgs
+                $script:kaProc = Get-Process -Id $kaPid -ErrorAction Stop   # taken while the creation handle pins the PID
+                $null = $script:kaProc.Handle
+                [WowcubeHiddenLaunch2]::Release($kaPid)
+                Write-Host "keep-alive: pid $kaPid, a yaw pulse every $KeepAliveSec s (log $kaLog; off: -NoKeepAlive)"
+            } catch { Write-Host "WARNING: keep-alive did not start ($($_.Exception.Message)): the game pauses after 60 s without input" -ForegroundColor Yellow }
+        }
     }
 }
 $timeout = $(if ($Seconds -gt 0) { $Seconds + 40 } else { 24 * 3600 })
 $r = Watch-HiddenProcess -ProcessId $procId -TimeoutSec $timeout -LogFile $visLog -OnPoll $onPoll -Exe $Exe
+if ($script:kaProc) {
+    # normally gone already (the simulator closed its socket); otherwise stop it through the handle we hold
+    if (-not $script:kaProc.WaitForExit(3000)) { try { $script:kaProc.Kill() } catch { } }
+    if (Test-Path -LiteralPath $kaLog) { Get-Content -LiteralPath $kaLog | ForEach-Object { "  $_" } }
+}
 
 # --- report -------------------------------------------------------------------
 $pngs = @(Get-ChildItem -LiteralPath $frames -Filter 'frame_*.png' -ErrorAction SilentlyContinue | Sort-Object Name)

@@ -144,6 +144,34 @@ for motion and video captures.
 an MCP session (a playtest) is `-Seconds 1500 -EveryMs 0 -AllowEarlyStop` (a lifetime longer than the 10-20 min a playtest takes; it is stopped early anyway), driven with `tools\sim\mcp.ps1 -Port <port> ...` and
 ended with `tools\sim\stop.ps1 -RunInfo <OutDir>\run_info.json` (stops that PID only if it is still the same exe).
 
+**Battery-save keep-alive.** After 60 s with no tap, twist or sustained movement (`OCT_BATSAVE_IDLE_MS`; a game's own
+autoplay is none of them) the engine enters battery save: the cube dims and a game shows a "PAUSED" toast and stops.
+So both wrappers start `tools/sim/keepalive.py` for a run longer than 50 s (or `-Seconds 0`) once the MCP port is
+known: every 25 s (`-KeepAliveSec` / `--keepalive-sec`) it spins the cube 1080 deg about the vertical axis with 36
+`turn 30 0 0`, one a frame (~0.6 s). The simulator feeds each frame's rotation to the gyro spread over that frame, so
+that is ~1800 deg/s for longer than the 300 ms the engine's sustained-movement detector needs (smoothed gyro L1 above
+625 deg/s, `oct_gesture_core.h`); the idle clock restarts. Yaw is about the world vertical, so gravity in cube space
+(tilt) never changes, and three whole turns bring the pose back. Measured with a 24-screen game, 100 s at 1 s frames:
+without it battery save came on at 61.5 s (frames dim from 38.0 to 31.8 mean, "PAUSED" on every face); with it, none
+in 100 s; one pulse at ~21 s alone moved battery save from 60.8 s to 82.1 s; MCP `record` showed gravity
+(0, -1, 0) in every frame during a pulse while the yaw ran through 360 deg three times. Pulses are logged in
+`<OutDir>/keepalive.log`; `run_info.json` says `keepalive: true`. A tap sent during a pulse may be dropped
+("rotating the cube is not tapping it"): send it again. `-NoKeepAlive` / `--no-keepalive` only to test battery save.
+
+### What the frame dump draws
+
+A `--frames` PNG copies each screen's 240×240 RGB565 framebuffer pixel for pixel (expanded to 8 bits, no scaling or
+filtering) into a cross on a `#282828` (40, 40, 40) background: 4 px gaps between the four screens of a face, 12 px
+between faces, the empty corners of the cross. Those grey lines are the dump's, not the game's (the cube's bezels are
+not drawn). Inside a screen everything is the engine's own output: it renders into a 120×120 back buffer and doubles
+it to 240×240 (edges step in 2 px), and the doubling takes each pixel pair's red from the previous back-buffer pixel
+(`oct_render.h`, "Upscale backbuffer, shift red"; the same engine code runs on the cube). So red sits 2 px off green
+and blue along the screen's own rows: a bright shape on a darker colour gets a 2 px pink line on one side and a 2 px
+cyan one on the other (measured on a QA frame's teal arrow disc: the white stem's G/B at x 598-629, its R at 596-627,
+while the source sprite's edge is clean), horizontal on some screens of the cross and vertical on others (screen
+rotation). Every app shows it, the template too: not a defect. A defect is a fringe that is also in the source sprite, one in a key colour, wider than 2 px or
+all round a shape, or a line of the game's background colour along the inner screen edges (`tools/sim/seams.py`).
+
 ### Upload mode (Windows)
 
 `wowcube-sim --upload <file.oct> --mac <AA:BB:CC:DD:EE:FF> [--upload-name <label>] [--connect-sec N] [--dry-run]`

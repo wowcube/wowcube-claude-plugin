@@ -53,6 +53,43 @@ idle/walk/attack, state pairs (intact/broken, full/empty).
 | B6 | **States are distinguishable** at final size while keeping the footprint. | final x4 + in-context |
 | B7 | **Paired scenes line up** (day/night versions of one background): generated with the first as `subject_ref`. | visual overlay |
 
+## Numeric FAILs are questions: look, then fix or waive
+
+`art.py qa`'s numbers are proxies: a style score against the anchors, `fill`,
+and the set numbers (centroid, area, height, colour drift). They are often
+wrong for one asset: a back or side view "off style" because no anchor shows
+that pose, two different monsters in one `set` "drifting" in colour, a broken
+brick that should not fill its cell, a squash frame "pumping". Every such FAIL
+is a question; answer it with the picture, not with the number:
+
+1. Open the asset in the QA sheets (`qa/all.png`, `qa/sets.png` with its onion
+   skin, the flipbook GIF) next to the anchors.
+2. **Real** (the picture shows the defect): fix it as above (prompt, reference,
+   processing) and redraw.
+3. **False** (the picture is right, the number is not): waive that one check of
+   that one asset with a one-line reason saying what the picture shows:
+   `art.py waive <spec> --only hero_back --check style --reason "back view: same
+   palette and outline as the anchors, no anchor shows a back"`.
+   `qa` then prints `WAIVED <asset>: <check> - <reason>` and does not count it.
+   The waiver stores the final image's hash: once the image is redrawn or
+   reprocessed it no longer holds and the check counts again (look again).
+   `art.py waive <spec>` lists the waivers; `--drop` removes one.
+
+Waivable check ids: `style`, `fill`, `set_centroid`, `set_area`, `set_height`,
+`set_colour`. Never waivable (technical: fix them with `process`, the key or the
+size): `size`, `cutout` (transparency), `key` (key-colour fringe), `alpha`,
+`opaque`, `missing`, `empty`, and a kept sprite's `keep_size` / `keep_format` /
+`keep_original`. Waivers live in art.json (`qa_waivers`), or for a WowCube
+manifest in `<workspace>/qa_waivers.json`.
+
+**Never add anchors, split or regroup sets, or drop rules only to silence a
+check.** Anchors are the style (adding a pose to them, or removing one, moves the
+palette and outline checks of every other asset: removing the fire sprite from
+the anchors made every yellow sprite "fall out of the palette"); a `set` is one
+character's frames; the class exemptions (`@style_exempt`, `@pose_exempt`,
+`@colour_exempt`, `fill`) are for assets that are different *by design* and are
+declared in STYLE.md, not for one false number. One false number = one waiver.
+
 ## Reporting
 
 - Per asset: PASS, or what failed and what was changed.

@@ -127,14 +127,16 @@ def build(project, final_dir: Path, raw_dir: Path, report: dict, prompts: dict, 
         elif fin.exists() and fin.stat().st_mtime > report_time + 1:
             verdict = "STALE"          # the image changed after the last qa run
         else:
-            verdict = "FAIL" if any(not c["ok"] and c["hard"] for c in checks) else ("WARN" if any(not c["ok"] for c in checks) else "PASS")
+            open_ = [c for c in checks if c.get("waived") is None]     # a waived check was looked at and accepted
+            verdict = "FAIL" if any(not c["ok"] and c["hard"] for c in open_) else ("WARN" if any(not c["ok"] for c in open_) else "PASS")
         st = r.get("style")
         raw = raw_dir / f"{a.name}.png"
         k = max(2, min(8, 200 // max(a.size)))
         raw_img = f"<img src='{_b64(Image.open(raw), 200)}' title='raw model output'>" if raw.exists() else "<div class='dim'>no raw image</div>"
         fin_img = (f"<div class='px'><img src='{_b64(Image.open(fin))}' title='1x'><img src='{_b64(Image.open(fin), scale=k)}' "
                    f"title='x{k}'></div>") if fin.exists() else "<div class='dim'>not processed</div>"
-        items = "".join(f"<li class='{'dim' if c['ok'] else ''}'>{'ok' if c['ok'] else ('FAIL' if c['hard'] else 'warn')}: {esc(c['msg'])}</li>"
+        items = "".join(f"<li class='dim'>waived: {esc(c['msg'])} - {esc(c['waived'])}</li>" if c.get("waived") is not None else
+                        f"<li class='{'dim' if c['ok'] else ''}'>{'ok' if c['ok'] else ('FAIL' if c['hard'] else 'warn')}: {esc(c['msg'])}</li>"
                         for c in checks)
         style_chip = f"<span class='chip {st['verdict']}'>style {st['verdict']}</span>" if st else ""
         parts.append(

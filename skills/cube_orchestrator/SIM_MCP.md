@@ -26,6 +26,12 @@ The simulator (`wowcube-sim`, Windows, Linux, macOS) opens a control socket at s
   simulator's main thread once per frame; no reply within 15 s → `err timeout`
   (`record n ms` gets 15 s + n·ms + n/4 s; `mcp.ps1` waits that long plus 30 s, so one long
   recording never times out in the client first).
+- a second client is normal: for an instance that lives longer than 50 s the wrapper's keep-alive
+  (`tools/sim/keepalive.py`, `run_info.json` `keepalive: true`, log `<OutDir>/keepalive.log`) holds
+  its own connection and every 25 s sends 36 `turn 30 0 0` (~0.6 s, one a frame: a 1080 deg spin about
+  the vertical axis) so the engine never enters battery save (60 s without input: dimmed, "PAUSED").
+  Gravity in cube space and the pose after it are unchanged; a `tap` that lands inside a pulse can come
+  back `err tap_dropped` (a turning cube takes no taps): send it again.
 
 Clients. Windows: `tools/sim/mcp.ps1` (one connection, one reply line per command, exit 1
 on any `err`):
@@ -166,8 +172,9 @@ Short and scripted: every image costs tokens.
   eight modules' rows, as on hardware) and says where the tap went:
   `ok tap struck module 7 screen 1 quad 1 face 0 fused module 7 screen 1 quad 1 face 0 series 1 agreeing 8/8 delivered 1 match 1`.
   `match 1` = the tap went to the screen you struck; `delivered 1` = the game's `on_tap` got it
-  (`delivered 0`: the game was not taking input at that moment: still booting, paused after minutes
-  without input (the log's `[state] 6 -> 5`: that tap resumed it, tap again), frozen by an assembly, or
+  (`delivered 0`: the game was not taking input at that moment: still booting, paused by battery save
+  (the log's `[state] 6 -> 5`: that tap resumed it, tap again; with the keep-alive on this should not
+  happen: check `keepalive.log`), frozen by an assembly, or
   inside the engine's 1 s settle window: the engine delivers a tap only once its state has held 1000 ms
   (`OCT_GESTURE_STATE_SETTLE_MS`), and a game that calls `OCT_restart` (it sets the RUNNING state again)
   restarts that window, so the taps in the second after it are lost, on the cube as here. See "Lost taps

@@ -101,7 +101,8 @@ Codex draws). Talk about pictures only; no "manifest", "pack" or other pipeline 
 | `gen <spec> [--only a,b] [--set s] [--force] [--jobs 3]` | Codex draws every asset without a raw image (anchors + subject/sketch refs attached; assets whose `subject_ref` is drawn in the same batch go second). Counts every request against the image budget and refuses (exit 4) a run that does not fit; warns when a `fixes.json` note rules out what the prompt still asks for |
 | `budget <spec>` | image requests spent, the cap and where it comes from. Going past the cap is the user's call: ask them, then `--over-budget` (`--budget N` only lowers the cap for one run; above the budget it is refused unless `--over-budget` is given too) |
 | `process <spec> [--only a,b]` | key out the backdrop, fit to size (binary alpha unless the asset says `alpha: soft`); `motion` sets share one scale and are centroid-aligned; `colour_lock` frames are colour-matched; a `keep` asset is copied byte for byte from its original (never keyed or refitted). A set is always fitted together; while some members still have no raw image (a family leader drawn first), the members that have one are fitted together and it prints `partial set: refit when the family is complete` |
-| `qa <spec> [--only a,b] [--set s]` | size, real cut-out, key, alpha, fill, set rules (scale, jitter, colour lock) and the style score per asset (a `keep` asset: only size, PNG format and "still its original"); exit 1 on hard failures; sheets + per-animation GIFs in `<ws>/qa/`. Scope it to a family leader while the rest is still pending |
+| `qa <spec> [--only a,b] [--set s]` | size, real cut-out, key, alpha, fill, set rules (scale, jitter, colour lock) and the style score per asset (a `keep` asset: only size, PNG format and "still its original"); exit 1 on hard failures (every line names its check id, e.g. `[set_height]`; waived checks are not counted); sheets + per-animation GIFs in `<ws>/qa/`. Scope it to a family leader while the rest is still pending |
+| `waive <spec> --only a[,b] --check <id>[,<id>] --reason "..."` | a numeric FAIL a look at the picture shows is false: `qa` reports `WAIVED <asset>: <check> - <reason>` and does not count it while the final image is unchanged (its SHA-256 is stored; in art.json `qa_waivers`, for a manifest `<ws>/qa_waivers.json`). Waivable: `style`, `fill`, `set_centroid`, `set_area`, `set_height`, `set_colour`; never size, cut-out, key, alpha, missing, empty or kept-file checks. No `--only` lists the waivers, `--drop` removes |
 | `review <spec>` | `<ws>/review.html`: anchors, palette, sets with onion skin, every asset (raw, final x4, verdicts, prompt) with OK / Fix + note |
 | `feedback <spec> --file fb.json` | folds the page's "Copy feedback" JSON into `fixes.json` and prints the regen command |
 | `all <spec>` | gen -> process -> qa -> review |
@@ -214,7 +215,15 @@ held to the grown profile; the next `process` refits the complete set at one sha
 For every batch:
 1. `art.py gen` (only what is missing or failed), `process`, `qa`.
 2. Look at three views of each asset: raw output, final x4, and in context (on its background/next to neighbours at the real display scale). Read `qa/sets.png` and the GIFs for every set.
-3. Every FAIL: fix the cause (sharper prompt line in `fixes.json`, better subject ref, green key for pink subjects, `fill`, `pose_free`/`colour_exempt` only for intended changes) and regenerate only what failed plus set partners that must match.
+3. Every numeric FAIL is a question, not a verdict: open the picture (`qa/all.png`, `qa/sets.png` and its onion
+   skin, the GIF, next to the anchors) and decide. **False** (the picture is right, the number is not: a back
+   view no anchor shows, two different monsters in one set, a squash frame, a broken brick that should not fill
+   its cell) -> `art.py waive <spec> --only <asset> --check <id> --reason "<what the picture shows>"`; `qa`
+   then reports `WAIVED <asset>: <check> - <reason>` and does not count it until the image changes
+   (`references/QA_RULES.md`, "Numeric FAILs are questions"). Never add anchors, split sets or drop rules only
+   to silence a check: anchors move every other asset's palette and outline checks. Size, transparency, key
+   fringe, alpha and missing/empty/kept-file checks are technical and cannot be waived.
+   **Real** FAIL: fix the cause (sharper prompt line in `fixes.json`, better subject ref, green key for pink subjects, `fill`, `pose_free`/`colour_exempt` only for intended changes) and regenerate only what failed plus set partners that must match.
    **Style notes edit the source.** A `fixes.json` note is only **appended** to the prompt: it adds,
    it never removes. A note that contradicts the prompt ("no dark outline" when the `gen_prompt` or
    the Prompt block says "thick dark outline") leaves both instructions in the prompt and the model
@@ -223,7 +232,7 @@ For every batch:
    or STYLE.md and its Prompt block (plus the manifest's `_style`) when it concerns every asset.
    `fixes.json` keeps additions and subject refs. `gen` prints a warning for a note that rules out
    something the prompt still asks for.
-4. Style score FAIL: decide drift vs intended exception. Drift -> fix and redraw. Intended -> propose it to the artist; once accepted, `style_check: false` + a line under "Approved exceptions".
+4. Style score FAIL: decide drift vs intended exception vs a false number. Drift -> fix and redraw. A whole class of asset that departs by design (sky, logo, UI) -> propose it to the artist; once accepted, `style_check: false` + a line under "Approved exceptions". One asset that is right but measures wrong (a pose the anchors lack) -> `waive --check style`.
 5. Before the artist sees the batch: an independent consistency review by a fresh subagent (give it the anchors, STYLE.md, QA_RULES.md, `qa/all.png` and `qa/sets.png` when there are sets, not your conclusions). Codex in read-only mode is a good second opinion too (`references/CODEX.md`).
 
 ### 6. Artist review

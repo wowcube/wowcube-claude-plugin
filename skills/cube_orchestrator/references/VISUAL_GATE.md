@@ -142,6 +142,14 @@ looks missing. The `<prefix>meta.txt` lists one `snd`/`sndq` line per sound star
    marked skewed can also show neighbouring modules one tick apart (a counter 12/24 on one screen next to 13/24 on
    the next): capture timing, not a game bug ("Per-module skew in one frame" below).
 
+   **Long runs do not pause.** A run longer than 50 s (and every `-Seconds 0` / playtest instance) starts a
+   keep-alive (`tools/sim/keepalive.py`): every 25 s a 0.6 s spin of the whole cube about the vertical axis, which the
+   engine counts as the cube being handled, so its battery save (60 s idle: the cube dims, a game shows "PAUSED" and
+   stops) never starts; tilt (gravity in cube space) is unchanged. `run_info.json` says `keepalive: true`, pulses are
+   in `<OutDir>/keepalive.log`. A "PAUSED" toast or a dimmed cube in such a run is therefore not expected: the
+   keep-alive did not run (python missing, `-NoKeepAlive`; read its log) - rerun, do not judge those frames. Only a
+   check of battery save itself passes `-NoKeepAlive` / `--no-keepalive` (`simulator/README.md`).
+
    Every run also prints a `seams:` line for its last frame (`tools/sim/seams.py`, also runnable on any
    frame: exit 1 = seams). `seams: none` is the pass. A 2-px (x2 art) or 1-px (fullsize art) line of the background
    on the inner screen edges is screen-filling art placed at +-120: **major** V1 finding, fix = `QUAD_FILL` (+-119.5,
@@ -180,6 +188,13 @@ refused, never shown on the real display.
 | V7 | Motion between frames: what should move moved (autoplay), what should hold held, no flicker | tick logic, sequences |
 | V8 | Stability: the full run time, all frames written, no `terminate` or assert lines in the log | crashes, pool overflow |
 | V9 | This prompt's Verification items that can be seen | the prompt itself |
+
+**Drawn by the checker, not a finding** (`simulator/README.md`, "What the frame dump draws"): the grey `#282828`
+lines and fields (the dump's 4 px gaps between screens, 12 px between faces, the empty corners of the cross), and
+2 px pink/cyan pairs on the edges of bright shapes on every screen of every app, the template too (the engine draws
+at 120×120, doubles it and takes red from the previous pixel, so red sits 2 px off along each screen's rows). A
+fringe that is also in the source sprite (`qa/all.png`), in a key colour, wider than 2 px or all round a shape, or a
+background-colour line on the inner screen edges (`seams:`) is a real V1/V5 finding.
 
 **Verdict**: PASS, or FAIL with findings (format in `references/AGENT_BRIEFS.md`).
 Critical or major findings go to the fixer together with the frames that show them;

@@ -221,7 +221,16 @@ Through `cube_asset-builder`:
    (gen, process, qa, review) is the shortcut for one.
 3. **The loop**, for every batch: look at three views of each asset (raw output, final
    ×4, in context at device scale) plus `assets_<game>/qa/sets.png` and the set GIFs.
-   Every FAIL gets a cause-level fix (a prompt line in `fixes.json`, a better subject
+   Every numeric FAIL (`style`, `fill`, `set_centroid` / `set_area` / `set_height` /
+   `set_colour`) is a question answered by the picture: real -> fix; false (a back view
+   no anchor shows, two different monsters in one `set`, a squash frame, a broken brick
+   that should not fill its cell) -> `art.py waive <manifest> --only <asset> --check <id>
+   --reason "<what the picture shows>"`: `qa` reports `WAIVED`, does not count it, and
+   drops the waiver when the image changes (cube_art-director `references/QA_RULES.md`).
+   Never add anchors, split sets or drop rules only to silence a check (a QA run spent
+   ~25 min doing that, and removing one anchor broke the palette check of every yellow
+   sprite). Technical checks (size, cut-out, key, alpha, missing, empty) cannot be waived.
+   Every real FAIL gets a cause-level fix (a prompt line in `fixes.json`, a better subject
    reference, the green key, `fill`; exemptions only for intended changes) and a redraw
    of what failed plus the set partners that must match. A correction of the **look**
    (outline, shading, palette, light) edits where the look is written: the asset's
@@ -248,9 +257,10 @@ Through `cube_asset-builder`:
    the state; `--over-budget` draws past it only on the user's explicit yes. The procedural style and
    the user's own art cost none. Once it is spent: no more
    redraws; fix what processing can fix (`process` options, `@post`), then waive each
-   style or set rule still failing where `art.py qa` reads waivers: `fixes.json`
+   style or set rule still failing: per asset with `art.py waive ... --reason
+   "accepted under budget: <the finding>"`, or for a whole class with `fixes.json`
    `@style_exempt` / `@colour_exempt` / `@pose_exempt` / `@fill` (plus the line under
-   "Approved exceptions" in STYLE.md, with the finding) and list them in the final report
+   "Approved exceptions" in STYLE.md, with the finding), and list them in the final report
    as `accepted_under_budget`; then pack and go on to Stage 4 (a spent image budget never stops the
   run, `RUN_MODES.md` failure policy 3). A hard failure no key waives (wrong size, key colour left,
    an empty frame) is a processing problem: fix it with `process`; if one remains, Stage 3
