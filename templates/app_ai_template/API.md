@@ -391,13 +391,12 @@ Code draws every tier the same way (`OCT_add`, `OCT_sequence`); the tier is chos
   ahead, 3/16 behind-below, 5/16 below, 1/16 ahead-below), then the lossless RLE encode. Use it for photographic art
   with smooth gradients (sky, glow, skin); it trades banding for fine noise and changes nothing on flat colours.
 - `flags.additive` = additive blend (glows, light); `flags.bg` = opaque blit (index 0 still skipped, `Transp` ignored).
-- Launcher icon (`icon` object): full colour 160x160 by default (1..240, optional dither), or palette 120 (x2) / 240
-  (fullsize). In the pack it is a MAP asset named exactly `ico` among the first 512 assets (the shell spawns it with
-  `OCT_external_map`); without it the icon slot stays empty. **The default full-colour icon is RAW565: it has no
-  transparency**, so the transparent corners of a hexagon badge render black on the dark launcher (a black square
-  around the badge). Real transparent corners need the palette tier, `"icon": {"color": "palette", "side": 120}`
-  (drawn x2) or `240` (fullsize): the pipeline packer resizes the icon PNG to that side and keeps its alpha as
-  palette index 0.
+- Launcher icon (`icon` object): the standard is `{"color": "palette", "side": 160}`, a 160x160 palette sprite
+  drawn 1:1 (FULLSIZE) with alpha, the shape every shipped game uses, so it shows at 160 px like the other icons. In
+  the pack it is a MAP asset named exactly `ico` among the first 512 assets (the shell spawns it with
+  `OCT_external_map` and draws its sprite at its own size); without it the icon slot stays empty. Without the
+  `icon` object the icon is full colour 160x160: RAW565 has no transparency, so the hexagon's corners render black.
+  Palette 120 is drawn x2 and palette 240 1:1: both show the icon at 240 px, bigger than every other game's.
 
 **More codecs** (produced by the SDK's `octpacker` from `!pack.txt` group tokens, **not** by the pipeline's
 packer, which writes palette and RAW565 plain/RLE only):

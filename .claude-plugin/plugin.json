@@ -1,6 +1,6 @@
 {
   "name": "wowcube",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "description": "Make WowCube games (or just their art) from an idea in plain words: Claude designs, draws, codes and checks the game, then gives you a link and a QR code to install it on your cube from your phone. Start with cube_orchestrator (\"make a cube game\").",
   "author": {
     "name": "WowCube"

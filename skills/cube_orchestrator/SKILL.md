@@ -416,9 +416,9 @@ Read `references/STAGE3_ASSETS.md`, then run its steps in order:
    `sound_kit.py build`, music with `sound_kit.py loop`, licences in `app_<game>/sound/CREDITS.md`
    (synthesis fills what is not approved). Either way judged by `sound_kit.py inspect` (never played).
 5. **Launcher icon** in the game's style: a square picture cut into the launcher's standard hexagon by
-   `scripts/icon_badge.py make` (never a drawn hexagon) → `app_<game>/art/icon.png`. The default packed icon is full colour (RAW565: its
-   transparent corners render black on the dark launcher); transparent corners need the
-   manifest's `icon` object at palette 120 or 240 (API.md, Art tiers).
+   `scripts/icon_badge.py make` (never a drawn hexagon) → `app_<game>/art/icon.png`. The manifest's `icon` object is
+   `"icon": {"color": "palette", "side": 160}` (160 px like every other game, transparent corners; never 120 or 240,
+   which show it at 240 px).
 6. **Fonts**: the template's BMFonts unless the GDD asks for others.
 7. **Pack**: `<skills>/scripts/build_pipeline.py pack` into `app_<game>/` with `--manifest` and
    `--icon`. It refuses an incomplete set before writing anything, rebuilds its

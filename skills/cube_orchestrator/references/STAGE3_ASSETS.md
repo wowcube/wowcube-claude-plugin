@@ -115,9 +115,8 @@ cannot judge (sizes that read like on-screen pixels, panoramas, the sound plan):
   `color: "palette"` + `flags.fullsize`, `background: "key"`: a square picture in the
   game's style, cut into the launcher's standard hexagon by `scripts/icon_badge.py make`
   (never a drawn hexagon: it comes out bigger or smaller than every other icon). The **packed** tier comes from
-  the manifest's top-level `icon` object: the default (full colour, 160) is RAW565, so
-  the corners render black on the dark launcher; transparent corners need
-  `"icon": {"color": "palette", "side": 120}` (drawn ×2) or `240` (fullsize). Details:
+  the manifest's top-level `icon` object, always `"icon": {"color": "palette", "side": 160}` (160 px on
+  the cube like every other game, transparent corners; 120 or 240 show it at 240 px). Details:
   `cube_asset-builder/references/ART.md` "Launcher icon".
 
 ## 2. Style lock: the one creative checkpoint
@@ -388,8 +387,8 @@ icon: `repack_app.py` and `build_pipeline.py pack` take `assets_<game>/icon.png`
 - Copy `assets_<game>/art/<icon entry>.png` to `app_<game>/art/icon.png`; the pack gets
   `--icon app_<game>/art/icon.png`. The pack warns when the template icon would ship;
   that warning blocks delivery.
-- The PNG's transparent corners survive only with a palette `icon` tier (120 or 240,
-  §1); with the default full-colour icon they render black on the launcher.
+- The PNG's transparent corners survive only with the palette `icon` tier, `"icon": {"color": "palette", "side": 160}`
+  (§1); without an `icon` object (full colour) they render black on the launcher.
 - Stage 5 checks that the `.oct` carries the `ico` map the launcher looks for.
 
 ## 6. Fonts

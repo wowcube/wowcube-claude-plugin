@@ -80,14 +80,16 @@ ALLOWED_SPRITE_COLORS = frozenset({"palette", "full"})
 # Launcher icon (optional top-level `icon` object). Same three tiers as
 # sprites, but the icon is standalone: a palette icon gets its OWN dedicated
 # .pal record instead of joining the shared sprite palette groups.
-#   - palette + side 120: cheap; engine upscales x2 -> 240 on screen
-#   - palette + side 240: FULLSIZE, draws 1:1
-#   - full (default) + side 1..240: RAW565, FULLSIZE, optional dither
-# Palette icons only ship in the two device-proven shapes (120 / 240).
+#   - palette + side 160: FULLSIZE, draws 1:1 at 160 px with transparent corners: the launcher's standard,
+#     the shape every shipped WowCube game uses (FULLSIZE + ALPHA palette sprite, 160x160)
+#   - palette + side 120: engine upscales x2 -> 240 on screen; side 240: FULLSIZE, 240 on screen. Both are
+#     half again as big as every other icon on the launcher: kept only for games packed that way before
+#   - full (default when there is no icon object) + side 1..240: RAW565, FULLSIZE, no transparency
 ALLOWED_ICON_COLORS = frozenset({"palette", "full"})
 ICON_DEFAULT_SIDE = 160
+ICON_STANDARD_SIDE = 160        # the launcher draws every other game's icon at 160 px
 ICON_MAX_SIDE = 240
-ICON_PALETTE_SIDES = (120, 240)
+ICON_PALETTE_SIDES = (160, 120, 240)
 # The engine streams sounds through a small window (firmware since 2026-09):
 # no 2 s / 64 KB cap any more, music beds and long loops are fine. The bound
 # below only catches typos (a 10-minute ceiling).
@@ -237,6 +239,11 @@ def load_manifest(path: str | Path, strict: bool = False) -> Manifest:
     return m
 
 
+def icon_screen_side(icon: Icon) -> int:
+    """The icon's side in pixels on the cube's screen: palette sides up to 120 are drawn x2, the rest 1:1."""
+    return icon.side * 2 if (icon.color == "palette" and icon.side <= 120) else icon.side
+
+
 def validate_icon(icon: Icon) -> list[str]:
     """Validate one launcher-icon config. Empty list = valid.
 
@@ -263,11 +270,9 @@ def validate_icon(icon: Icon) -> list[str]:
             )
         if icon.side not in ICON_PALETTE_SIDES:
             errors.append(
-                f"icon: palette icons must be side 120 (engine upscales x2 -> "
-                f"240 on screen) or 240 (fullsize, draws 1:1) -- side "
-                f"{icon.side} is not one of the proven shapes; use 120 or "
-                f"240, or color 'full' for arbitrary sides up to "
-                f"{ICON_MAX_SIDE}"
+                f"icon: palette icons must be side 160 (the launcher's standard, "
+                f"draws 1:1 with transparent corners); 120 and 240 are kept for "
+                f"older games only -- side {icon.side} is not one of them"
             )
     else:  # full
         if not (1 <= icon.side <= ICON_MAX_SIDE):
@@ -685,6 +690,10 @@ def pipeline_findings(data: dict, m: Manifest) -> tuple[list[str], list[str]]:
         if icon.color == "full":
             warnings.append(f"sprite {LAUNCHER_ICON_NAME!r}: color \"full\" has no transparency - the corners "
                             f"cannot be transparent")
+    if m.icon is not None and data.get("_origin") is None and icon_screen_side(m.icon) != ICON_STANDARD_SIDE:
+        warnings.append(f"icon: {{\"color\": \"{m.icon.color}\", \"side\": {m.icon.side}}} draws the launcher icon at "
+                        f"{icon_screen_side(m.icon)} px on the cube, every other game's icon is "
+                        f"{ICON_STANDARD_SIDE} px: use {{\"color\": \"palette\", \"side\": 160}}")
 
     panoramas = data.get("_panoramas")
     if panoramas is not None and not isinstance(panoramas, dict):

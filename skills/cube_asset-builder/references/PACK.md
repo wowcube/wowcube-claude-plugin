@@ -61,12 +61,12 @@ RLE, nothing else). Smoothing (`smooth_rows` in `pack_beta.py`) exists only
 as an opt-in size tool for noisy video sources; never apply it by default or
 in the name of quality.
 
-The launcher icon's tier comes from the manifest `icon` object (default
-full color, 160×160); `pack.py --icon-color palette|full`, `--icon-side N`
-and `--icon-dither` override it for one run. The default full-color icon is
-RAW565: no transparency, so the badge's transparent corners render black on the
-dark launcher. Palette icons (120, drawn ×2, or 240, fullsize; nothing else) keep
-the PNG's alpha as palette index 0: the PNG is resized to that side.
+The launcher icon's tier comes from the manifest `icon` object; `pack.py --icon-color palette|full`,
+`--icon-side N` and `--icon-dither` override it for one run. The standard is `"icon": {"color": "palette", "side": 160}`: 160×160
+drawn 1:1 with its own palette, the PNG's alpha kept as index 0 (transparent corners), the same shape every
+shipped game uses. Without an `icon` object it is full colour 160 (RAW565: the right size, black corners).
+Palette 120 (drawn ×2) and 240 exist only for games packed that way before: both show the icon at 240 px,
+bigger than every other icon on the launcher.
 
 ## Direct pack.py calls (rarely needed)
 

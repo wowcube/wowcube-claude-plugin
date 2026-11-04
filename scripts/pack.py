@@ -165,10 +165,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         '(default: manifest icon.color, else full)')
     p.add_argument('--icon-side', type=int, default=None,
                    help='Launcher icon side in pixels (square), overriding '
-                        'the manifest icon object. Palette icons allow only '
-                        'the proven 120 (drawn x2 -> 240) or 240 (fullsize, '
-                        '1:1); full-color allows 1..240 '
-                        '(default: manifest icon.side, else 160)')
+                        'the manifest icon object. Palette icons: 160 (the '
+                        'launcher standard, 1:1 with alpha); 120 (drawn x2) and '
+                        '240 only for games packed that way before; full-color '
+                        'allows 1..240 (default: manifest icon.side, else 160)')
     p.add_argument('--icon-dither', action=argparse.BooleanOptionalAction,
                    default=None,
                    help='Floyd-Steinberg dithering for a full-color icon, '
